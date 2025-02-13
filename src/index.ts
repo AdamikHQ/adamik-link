@@ -2,7 +2,11 @@ import { Turnkey } from "@turnkey/sdk-server";
 import * as dotenv from "dotenv";
 import * as path from "path";
 import prompts from "prompts";
-import { amountToMainUnit, amountToSmallestUnit } from "./utils";
+import {
+  amountToMainUnit,
+  amountToSmallestUnit,
+  formatSignature,
+} from "./utils";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 
@@ -34,7 +38,7 @@ async function main() {
     throw new Error("No account selected");
   }
 
-  const accountId = selectedAccount.address;
+  let accountId = selectedAccount.address;
 
   const { pubKey } = await prompts({
     type: "select",
@@ -91,6 +95,51 @@ async function main() {
 
   if (!chainId) {
     throw new Error("No chain selected");
+  }
+
+  if (pubKey) {
+    const fetchPubkeyToAddresses = await fetch(
+      `${process.env.ADAMIK_API_BASE_URL}/api/${chainId}/address/encode`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: process.env.ADAMIK_API_KEY!,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          pubkey: pubKey,
+        }),
+      }
+    );
+
+    const pubkeyToAddresses = await fetchPubkeyToAddresses.json();
+
+    if (
+      pubkeyToAddresses.status &&
+      pubkeyToAddresses.status.errors.length > 0
+    ) {
+      throw new Error(pubkeyToAddresses.status.errors[0].message);
+    }
+
+    const addresses = pubkeyToAddresses.addresses;
+
+    const { selectedAddress } = await prompts({
+      type: "select",
+      name: "selectedAddress",
+      message:
+        "We have detected multiple addresses for this pubkey, please select the one you want to use or skip to keep your wallet one",
+      choices: [
+        { title: "Skip" },
+        ...addresses.map((address: { type: string; address: string }) => ({
+          title: `${address.address} (${address.type})`,
+          value: address.address,
+        })),
+      ],
+    });
+
+    if (selectedAddress) {
+      accountId = selectedAddress;
+    }
   }
 
   console.log(
@@ -211,48 +260,74 @@ async function main() {
     JSON.stringify(transactionEncodeResponse.transaction.encoded, null, 2)
   );
 
-  const { hashFunction } = await prompts({
+  const { signMethod } = await prompts({
     type: "select",
-    name: "hashFunction",
-    message: "Select corresponding hash function",
+    name: "signMethod",
+    message: "Select a sign method",
     choices: [
       {
-        title: "HASH_FUNCTION_NOT_APPLICABLE",
-        value: "HASH_FUNCTION_NOT_APPLICABLE",
+        title: "signTransaction",
+        value: "signTransaction",
       },
       {
-        title: "HASH_FUNCTION_SHA256",
-        value: "HASH_FUNCTION_SHA256",
-      },
-      {
-        title: "HASH_FUNCTION_KECCAK256",
-        value: "HASH_FUNCTION_KECCAK256",
-      },
-      {
-        title: "HASH_FUNCTION_NO_OP",
-        value: "HASH_FUNCTION_NO_OP",
+        title: "signRawPayload",
+        value: "signRawPayload",
       },
     ],
   });
 
-  const txSignResult = await turnkeyClient.apiClient().signRawPayload({
-    signWith: accountId,
-    payload: transactionEncodeResponse.transaction.encoded,
-    encoding: "PAYLOAD_ENCODING_HEXADECIMAL",
-    hashFunction: hashFunction,
-  });
+  let txSignResult: any;
+  let signature: string;
+  if (signMethod === "signTransaction") {
+    if (chains[chainId].family !== "evm") {
+      throw new Error("This chain is not supported for this method");
+    }
+    txSignResult = await turnkeyClient.apiClient().signTransaction({
+      signWith: accountId,
+      unsignedTransaction: transactionEncodeResponse.transaction.encoded,
+      type: "TRANSACTION_TYPE_ETHEREUM",
+    });
 
-  console.log({ txSignResult });
-  const { r, s, v } = txSignResult;
-  let signatureBytes: Buffer;
-  if (hashFunction === "HASH_FUNCTION_NOT_APPLICABLE") {
-    signatureBytes = Buffer.from(r + s, "hex");
+    signature = txSignResult.signedTransaction;
+  } else if (signMethod === "signRawPayload") {
+    const { hashFunction } = await prompts({
+      type: "select",
+      name: "hashFunction",
+      message: "Select corresponding hash function",
+      choices: [
+        {
+          title: "HASH_FUNCTION_NOT_APPLICABLE",
+          value: "HASH_FUNCTION_NOT_APPLICABLE",
+        },
+        {
+          title: "HASH_FUNCTION_SHA256",
+          value: "HASH_FUNCTION_SHA256",
+        },
+        {
+          title: "HASH_FUNCTION_KECCAK256",
+          value: "HASH_FUNCTION_KECCAK256",
+        },
+        {
+          title: "HASH_FUNCTION_NO_OP",
+          value: "HASH_FUNCTION_NO_OP",
+        },
+      ],
+    });
+
+    txSignResult = await turnkeyClient.apiClient().signRawPayload({
+      signWith: accountId,
+      payload: transactionEncodeResponse.transaction.encoded,
+      encoding: "PAYLOAD_ENCODING_HEXADECIMAL",
+      hashFunction: hashFunction,
+    });
+
+    signature = formatSignature(txSignResult, chainId);
   } else {
-    signatureBytes = Buffer.from(r + s + v, "hex");
+    throw new Error("No sign method selected");
   }
 
-  const signature = signatureBytes.toString("hex");
-  console.log("Transaction signed : ", signature);
+  // const signature = formatSignature(txSignResult, chainId, chains);
+  console.log("Transaction signed : ", txSignResult);
 
   console.log("SUMMARY :");
   console.log(`- Sender : ${accountId}`);

@@ -16,3 +16,18 @@ export const amountToMainUnit = (
     ? null
     : (parsedAmount / Math.pow(10, decimals)).toString();
 };
+
+export const formatSignature = (
+  txSignResult: { r: string; s: string; v: string },
+  chainId: string
+): string => {
+  const { r, s, v } = txSignResult;
+
+  if (chainId === "ton") {
+    const signatureBytes = Buffer.from(r + s, "hex");
+    return signatureBytes.toString("hex");
+  } else {
+    const signatureBytes = Buffer.from(r + s + v, "hex");
+    return signatureBytes.toString("hex");
+  }
+};
