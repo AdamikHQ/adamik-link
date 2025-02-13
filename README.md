@@ -55,13 +55,7 @@ To run the generic chain transaction script:
 
 ```bash
 npm start
-```
-
-```bash
 pnpm start
-```
-
-```bash
 yarn start
 ```
 
@@ -79,6 +73,8 @@ To run the TON-specific transaction script:
 
 ```bash
 npm run ton
+pnpm run ton
+yarn run ton
 ```
 
 This script is specifically designed for TON blockchain transactions and includes:
@@ -96,15 +92,6 @@ This script is specifically designed for TON blockchain transactions and include
 - Interactive CLI interface
 - Amount conversion utilities
 - Specific TON blockchain implementation
-
-## Error Handling
-
-The application includes error handling for:
-
-- Missing environment variables
-- Failed transaction encoding
-- Failed broadcasts
-- Invalid inputs
 
 ## Security Notes
 
