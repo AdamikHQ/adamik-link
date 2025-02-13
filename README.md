@@ -39,15 +39,9 @@ BASE_URL="https://api.turnkey.com"
 ORGANIZATION_ID="<Turnkey organization ID>"
 ADAMIK_API_KEY="<get your API key from adamik.io>"
 ADAMIK_API_BASE_URL="https://api.adamik.io"
-
-# For TON Only
-TON_ADDRESS="<existing TON address in your organization>"
-TON_PUBLIC_KEY="<existing TON pubkey compressed matching your above address in your organization>"
 ```
 
 ## Usage
-
-The project provides two main scripts:
 
 ### Generic Chain Transaction
 
@@ -67,23 +61,6 @@ This script will:
 4. Guide you through creating and signing a transaction
 5. Broadcast specific transaction
 
-### TON-Specific Transaction
-
-To run the TON-specific transaction script:
-
-```bash
-npm run ton
-pnpm run ton
-yarn run ton
-```
-
-This script is specifically designed for TON blockchain transactions and includes:
-
-1. TON address encoding
-2. Balance checking
-3. Transaction creation and signing
-4. Broadcasting to the TON network
-
 ## Features
 
 - Multi-chain support through Adamik API
@@ -91,7 +68,6 @@ This script is specifically designed for TON blockchain transactions and include
 - Balance checking
 - Interactive CLI interface
 - Amount conversion utilities
-- Specific TON blockchain implementation
 
 ## Security Notes
 
