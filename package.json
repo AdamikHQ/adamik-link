@@ -1,0 +1,21 @@
+{
+  "name": "node-starter",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "ton": "ts-node src/ton.ts",
+    "start": "ts-node src/index.ts"
+  },
+  "dependencies": {
+    "@turnkey/sdk-server": "^2.0.1",
+    "dotenv": "^16.4.7",
+    "prompts": "^2.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.2",
+    "@types/prompts": "^2.4.7",
+    "ts-node": "^10.9.1",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.2.2"
+  }
+}
