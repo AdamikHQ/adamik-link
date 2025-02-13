@@ -20,11 +20,11 @@ async function main() {
   });
 
   const { selectedAccount } = await prompts({
-    type: "select",
+    type: "autocomplete",
     name: "selectedAccount",
     message: "Select an account",
     choices: accounts.map((account) => ({
-      title: account.address,
+      title: `${account.address}`,
       value: { path: account.path, address: account.address },
       description: `curve: ${account.curve} | addressFormat: ${account.addressFormat} | path: ${account.path}`,
     })),
@@ -44,7 +44,14 @@ async function main() {
     choices: [
       { title: "Skip", value: undefined },
       ...accounts
-        .filter((account) => account.path === selectedAccount.path)
+        .filter(
+          (account) =>
+            account.path === selectedAccount.path &&
+            [
+              "ADDRESS_FORMAT_UNCOMPRESSED",
+              "ADDRESS_FORMAT_COMPRESSED",
+            ].includes(account.addressFormat)
+        )
         .map((account) => ({
           title: account.address,
           value: account.address,
@@ -135,15 +142,22 @@ async function main() {
     message: "What is the recipient address?",
   });
 
+  if (!recipientAddress) {
+    throw new Error("No recipient address provided");
+  }
+
   const { amount } = await prompts({
     type: "text",
     name: "amount",
-    message: `How much ${chains[chainId].ticker} to transfer ? (default is 0.05)`,
-    initial: "0.05",
+    message: `How much ${chains[chainId].ticker} to transfer ? (default is 0.1% of your balance)`,
+    initial: amountToMainUnit(
+      (BigInt(balance.balances.native.available) / 1000n).toString(),
+      chains[chainId].decimals
+    ) as string,
   });
 
-  if (!recipientAddress || !amount) {
-    throw new Error("No recipient address or amount provided");
+  if (!amount) {
+    throw new Error("No amount provided");
   }
 
   console.log("Encoding transaction...");
@@ -228,8 +242,14 @@ async function main() {
     hashFunction: hashFunction,
   });
 
-  const { r, s } = txSignResult;
-  const signatureBytes = Buffer.from(r + s, "hex");
+  console.log({ txSignResult });
+  const { r, s, v } = txSignResult;
+  let signatureBytes: Buffer;
+  if (hashFunction === "HASH_FUNCTION_NOT_APPLICABLE") {
+    signatureBytes = Buffer.from(r + s, "hex");
+  } else {
+    signatureBytes = Buffer.from(r + s + v, "hex");
+  }
 
   const signature = signatureBytes.toString("hex");
   console.log("Transaction signed : ", signature);
