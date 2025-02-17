@@ -1,7 +1,6 @@
 import { Turnkey } from "@turnkey/sdk-server";
 import * as dotenv from "dotenv";
 import * as path from "path";
-import prompts from "prompts";
 import { adamikBroadcastTransaction } from "./adamikBroadcastTransaction";
 import { adamikEncodeTransaction } from "./adamikEncodeTransaction";
 import { adamikFetchBalance } from "./adamikFetchBalance";
@@ -55,20 +54,6 @@ async function main() {
     `- Amount : ${transactionEncodeResponse.transaction.data.amount} ${chains[chainId].ticker}`
   );
   console.log(`- Chain : ${chains[chainId].name}`);
-
-  const { acceptBroadcast } = await prompts({
-    type: "confirm",
-    name: "acceptBroadcast",
-    message: "Do you want to proceed with the broadcast ?",
-    initial: true,
-  });
-
-  if (!acceptBroadcast) {
-    console.log("Transaction not broadcasted.");
-    return;
-  }
-
-  console.log("Broadcasting transaction...");
 
   await adamikBroadcastTransaction(
     chainId,

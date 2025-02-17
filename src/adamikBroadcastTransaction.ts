@@ -1,3 +1,4 @@
+import prompts from "prompts";
 import { TransactionEncodeResponse } from "./types";
 
 export const adamikBroadcastTransaction = async (
@@ -5,6 +6,20 @@ export const adamikBroadcastTransaction = async (
   transactionEncodeResponse: TransactionEncodeResponse,
   signature: string
 ) => {
+  const { acceptBroadcast } = await prompts({
+    type: "confirm",
+    name: "acceptBroadcast",
+    message: "Do you want to proceed with the broadcast ?",
+    initial: true,
+  });
+
+  if (!acceptBroadcast) {
+    console.log("Transaction not broadcasted.");
+    return;
+  }
+
+  console.log("Broadcasting transaction...");
+
   // Prepare to broadcast the signed transaction
   const broadcastRequestBody = {
     transaction: {

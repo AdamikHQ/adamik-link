@@ -1,10 +1,7 @@
 export type SignerSpecs = {
   curve: string;
   hashFunction: "sha256" | "keccak256" | "pedersen" | "sha512_256";
-  signatureFormat: {
-    includesV: boolean;
-    components: string[];
-  };
+  signatureFormat: string[];
   derivationPath: string;
   addressFormat: string;
 };

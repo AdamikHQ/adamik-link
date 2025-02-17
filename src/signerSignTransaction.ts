@@ -98,8 +98,7 @@ export const signerSignTransaction = async (
       hashFunction: hashFunction,
     });
 
-    const signatureComponent =
-      chains[chainId].signerSpecs.signatureFormat.components;
+    const signatureComponent = chains[chainId].signerSpecs.signatureFormat;
 
     signature = signatureComponent.reduce((acc, component) => {
       if (component === "r") {
