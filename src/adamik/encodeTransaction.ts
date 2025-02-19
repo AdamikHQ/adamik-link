@@ -1,19 +1,36 @@
 import prompts from "prompts";
-import { Balance, Chain, TransactionEncodeResponse } from "./types";
-import { amountToMainUnit, amountToSmallestUnit } from "./utils";
+import {
+  amountToMainUnit,
+  amountToSmallestUnit,
+  errorTerminal,
+  infoTerminal,
+} from "../utils";
+import {
+  AdamikAPIError,
+  AdamikBalance,
+  AdamikTransactionEncodeResponse,
+} from "./types";
 
-export const adamikEncodeTransaction = async (
-  chainId: string,
-  accountId: string,
-  chains: Record<string, Chain>,
-  balance: Balance,
-  pubKey?: string
-) => {
+export const encodeTransaction = async ({
+  chainId,
+  senderAddress,
+  decimals,
+  ticker,
+  balance,
+  pubkey,
+}: {
+  chainId: string;
+  senderAddress: string;
+  decimals: number;
+  ticker: string;
+  balance: AdamikBalance;
+  pubkey?: string;
+}) => {
   const { recipientAddress } = await prompts({
     type: "text",
     name: "recipientAddress",
-    message: "What is the recipient address?",
-    initial: "cosmos1ksdpkf8l9ypzqqqx38y3x8sdkndw8ytjhuxpwj",
+    message: "What is the recipient address ? (default is signer address)",
+    initial: senderAddress,
   });
 
   if (!recipientAddress) {
@@ -23,10 +40,10 @@ export const adamikEncodeTransaction = async (
   const { amount } = await prompts({
     type: "text",
     name: "amount",
-    message: `How much ${chains[chainId].ticker} to transfer ? (default is 0.1% of your balance)`,
+    message: `How much ${ticker} to transfer ? (default is 0.1% of your balance)`,
     initial: amountToMainUnit(
       (BigInt(balance.balances.native.available) / 1000n).toString(),
-      chains[chainId].decimals
+      decimals
     ) as string,
   });
 
@@ -34,23 +51,23 @@ export const adamikEncodeTransaction = async (
     throw new Error("No amount provided");
   }
 
-  console.log("Encoding transaction...");
+  infoTerminal("Encoding transaction...", "Adamik");
 
   const requestBody: any = {
     transaction: {
       data: {
         chainId: chainId,
         mode: "transfer",
-        senderAddress: accountId,
+        senderAddress: senderAddress,
         recipientAddress: recipientAddress,
-        amount: amountToSmallestUnit(amount, chains[chainId].decimals),
+        amount: amountToSmallestUnit(amount, decimals),
         useMaxAmount: false,
       },
     },
   };
 
-  if (pubKey) {
-    requestBody.transaction.data.senderPubKey = pubKey;
+  if (pubkey) {
+    requestBody.transaction.data.senderPubKey = pubkey;
   }
 
   const postTransactionEncode = await fetch(
@@ -65,15 +82,15 @@ export const adamikEncodeTransaction = async (
     }
   );
 
-  const transactionEncodeResponse: TransactionEncodeResponse =
+  const transactionEncodeResponse: AdamikAPIError<AdamikTransactionEncodeResponse> =
     await postTransactionEncode.json();
 
   if (transactionEncodeResponse.status.errors.length > 0) {
-    console.log("Transaction encoding failed, check payload :");
-    console.log(JSON.stringify(requestBody, null, 2));
+    errorTerminal("Transaction encoding failed, check payload :", "Adamik");
+    infoTerminal(JSON.stringify(requestBody, null, 2), "Adamik");
 
-    console.log(" and response :");
-    console.log(JSON.stringify(transactionEncodeResponse, null, 2));
+    infoTerminal(" and response :", "Adamik");
+    infoTerminal(JSON.stringify(transactionEncodeResponse, null, 2), "Adamik");
 
     throw new Error(
       transactionEncodeResponse.status.errors[0].message ||

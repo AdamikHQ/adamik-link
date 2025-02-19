@@ -14,12 +14,18 @@ importers:
       '@cosmjs/encoding':
         specifier: ^0.33.0
         version: 0.33.0
+      '@sodot/sodot-node-sdk-demo':
+        specifier: ^2.2.1
+        version: 2.2.1
       '@turnkey/sdk-server':
         specifier: ^2.0.1
         version: 2.0.1(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       dotenv:
         specifier: ^16.4.7
         version: 16.4.7
+      picocolors:
+        specifier: ^1.1.1
+        version: 1.1.1
       prompts:
         specifier: ^2.4.2
         version: 2.4.2
@@ -234,6 +240,12 @@ packages:
   '@noble/hashes@1.7.1':
     resolution: {integrity: sha512-B8XBPsn4vT/KJAGqDzbwztd+6Yte3P4V7iafm24bxgDe/mlRuK6xmWPuCNrKt2vDafZ8MfJLlchDG/vYafQEjQ==}
     engines: {node: ^14.21.3 || >=16}
+
+  '@sodot/sodot-node-sdk-demo@2.2.1':
+    resolution: {integrity: sha512-NGFprOHBMyj/o8Bt3luOapeThoF1ngMKlAZI8MHrfpo6p74ti71dqzYcVagEp+JDeXW5aIstXd4VC9+ThpOcsg==}
+
+  '@sodot/sodot-ts-internal@1.0.6':
+    resolution: {integrity: sha512-gtmXRyHcepcxlOmPi80tXxwXI+vTO2u4NRoiEEUKvJy8KWOCM3EwYCipIX+jnRFsm4ieeQ0APBkoZaPd3VLNZA==}
 
   '@swc/counter@0.1.3':
     resolution: {integrity: sha512-e2BR4lsJkkRlKZ/qCHPw9ZaSxc0MVUd7gtbtaB7aMvHeJVYe8sOB8DBZkP2DtISHGSku9sCK6T6cnY0CtXrOCQ==}
@@ -856,6 +868,14 @@ snapshots:
       '@noble/hashes': 1.7.1
 
   '@noble/hashes@1.7.1': {}
+
+  '@sodot/sodot-node-sdk-demo@2.2.1':
+    dependencies:
+      '@sodot/sodot-ts-internal': 1.0.6
+
+  '@sodot/sodot-ts-internal@1.0.6':
+    dependencies:
+      '@noble/hashes': 1.7.1
 
   '@swc/counter@0.1.3': {}
 
