@@ -14,8 +14,8 @@ This project demonstrates how to integrate Turnkey with the Adamik API to perfor
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/henri-ly/turnkey-adamik.git
-cd turnkey-adamik
+git clone https://github.com/henri-ly/adamik-connect.git
+cd adamik-connect
 ```
 
 2. Install dependencies:

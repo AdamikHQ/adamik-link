@@ -18,10 +18,12 @@ export const signerSelector = async (
     name: "signerName",
     message:
       "Please, select a signer, be sure to have properly set .env.local for the corresponding singer",
-    choices: [
-      { title: Signer.SODOT, value: Signer.SODOT },
-      { title: Signer.TURNKEY, value: Signer.TURNKEY },
-    ],
+    choices: Object.values(Signer)
+      .map((signer) => ({
+        title: signer,
+        value: signer,
+      }))
+      .sort((a, b) => a.title.localeCompare(b.title)),
   });
 
   switch (signerName) {
