@@ -9,7 +9,6 @@
   "dependencies": {
     "@cosmjs/crypto": "^0.33.0",
     "@cosmjs/encoding": "^0.33.0",
-    "@sodot/sodot-node-sdk-demo": "^2.2.1",
     "@turnkey/sdk-server": "^2.0.1",
     "dotenv": "^16.4.7",
     "picocolors": "^1.1.1",
