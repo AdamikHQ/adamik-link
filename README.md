@@ -1,10 +1,10 @@
 # Adamik Connect
 
-A TypeScript-based CLI tool for interacting with the Adamik blockchain. This tool allows you to perform various operations such as checking balances, encoding transactions, and broadcasting signed transactions using different signing providers.
+A TypeScript-based CLI tool for interacting with Adamik. This tool allows you to perform various operations such as checking balances, encoding transactions, and broadcasting signed transactions using different signing providers.
 
 ## Features
 
-- Connect to Adamik blockchain
+- Connect to (Adamik)[https://adamik.io]
 - Get chain information
 - Retrieve account balances (native and tokens)
 - Encode and sign transactions
