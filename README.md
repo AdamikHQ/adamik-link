@@ -16,7 +16,7 @@ A TypeScript-based CLI tool for interacting with the Adamik blockchain. This too
 ## Prerequisites
 
 - Node.js (v16 or higher recommended)
-- npm or yarn
+- pnpm or npm or yarn
 - Access to at least one of the supported signing providers (Sodot or Turnkey)
 
 ## Installation
