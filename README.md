@@ -24,7 +24,7 @@ A TypeScript-based CLI tool for interacting with Adamik. This tool allows you to
 1. Clone the repository:
 
 ```bash
-git clone git@github.com:AdamikHQ/adamik-connect.git
+git clone git@github.com:AdamikHQ/adamik-link.git
 cd adamik-link
 ```
 
