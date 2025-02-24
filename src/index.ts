@@ -60,7 +60,7 @@ async function main() {
       chains[chainId].decimals
     )} ${chains[chainId].ticker} - ${chains[chainId].name}`
   );
-  balance.balances.tokens.forEach((token) => {
+  balance.balances.tokens?.forEach((token) => {
     italicInfoTerminal(
       `${amountToMainUnit(token.amount, token.token.decimals)} ${
         token.token.ticker
