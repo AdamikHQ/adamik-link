@@ -62,7 +62,7 @@ async function main() {
   );
   balance.balances.tokens?.forEach((token) => {
     italicInfoTerminal(
-      `${amountToMainUnit(token.amount, token.token.decimals)} ${
+      `\t- ${amountToMainUnit(token.amount, token.token.decimals)} ${
         token.token.ticker
       } - ${token.token.name}`
     );
