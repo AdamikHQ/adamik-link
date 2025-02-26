@@ -109,18 +109,35 @@ export const successTerminal = (message: string, source?: string) => {
   console.log(picocolors.bgGreen(`[${source}] ${message}`));
 };
 
-export const italicInfoTerminal = (message: string) => {
-  console.log(picocolors.italic(`${message}`));
+export const italicInfoTerminal = async (message: string, delayMs = 50) => {
+  // Split the stringified JSON by newlines
+  const lines = message.split("\n");
+
+  // Display each line with a delay
+  for (const line of lines) {
+    console.log(picocolors.italic(line));
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+};
+
+const sanitizeSignature = (signature: { r: string; s: string; v?: string }) => {
+  return {
+    r: signature.r.replace("0x", ""),
+    s: signature.s.replace("0x", ""),
+    v: signature.v?.replace("0x", ""),
+  };
 };
 
 export const extractSignature = (
   signatureFormat: AdamikSignatureFormat,
   signature: { r: string; s: string; v?: string }
 ) => {
+  const sanitizedSignature = sanitizeSignature(signature);
+
   if (signatureFormat === AdamikSignatureFormat.RS) {
-    return signature.r + signature.s;
+    return sanitizedSignature.r + sanitizedSignature.s;
   } else if (signatureFormat === AdamikSignatureFormat.RSV) {
-    return signature.r + signature.s + signature.v;
+    return sanitizedSignature.r + sanitizedSignature.s + sanitizedSignature.v;
   } else {
     throw new Error(`Unsupported signature format: ${signatureFormat}`);
   }

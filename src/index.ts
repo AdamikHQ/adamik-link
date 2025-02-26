@@ -1,5 +1,6 @@
 import * as dotenv from "dotenv";
 import * as path from "path";
+import picocolors from "picocolors";
 import prompts from "prompts";
 import { broadcastTransaction } from "./adamik/broadcastTransaction";
 import { encodePubKeyToAddress } from "./adamik/encodePubkeyToAddress";
@@ -49,7 +50,7 @@ async function main() {
       infoTerminal(`Getting pubkey ...`, signer.signerName);
       const pubkey = await signer.getPubkey();
       infoTerminal(`Pubkey:`, signer.signerName);
-      italicInfoTerminal(JSON.stringify(pubkey, null, 2));
+      await italicInfoTerminal(JSON.stringify(pubkey, null, 2));
 
       if (!pubkey) {
         errorTerminal("Failed to get pubkey from signer", signer.signerName);
@@ -68,17 +69,23 @@ async function main() {
       infoTerminal(`Fetching balance ...`, "Adamik");
       const balance = await getAccountState(chainId, address);
       infoTerminal(`Balance:`, "Adamik");
-      italicInfoTerminal(
-        `\t- ${amountToMainUnit(
-          balance.balances.native.total,
-          chains[chainId].decimals
-        )} ${chains[chainId].ticker} - ${chains[chainId].name}`
+      console.log(
+        `\t- ${picocolors.cyan(
+          amountToMainUnit(
+            balance.balances.native.total,
+            chains[chainId].decimals
+          )
+        )} ${picocolors.bold(chains[chainId].ticker)} - ${picocolors.italic(
+          chains[chainId].name
+        )}`
       );
       balance.balances.tokens?.forEach((token) => {
-        italicInfoTerminal(
-          `\t- ${amountToMainUnit(token.amount, token.token.decimals)} ${
-            token.token.ticker
-          } - ${token.token.name}`
+        console.log(
+          `\t- ${picocolors.cyan(
+            amountToMainUnit(token.amount, token.token.decimals)
+          )} ${picocolors.bold(token.token.ticker)} - ${picocolors.italic(
+            token.token.name
+          )}`
         );
       });
 
@@ -132,7 +139,7 @@ async function main() {
       infoTerminal(`We will now sign the transaction ...`);
 
       infoTerminal(`- Signer spec:\n`, "Adamik");
-      italicInfoTerminal(JSON.stringify(signerSpec, null, 2));
+      await italicInfoTerminal(JSON.stringify(signerSpec, null, 2), 2000);
 
       const { continueSigning } = await prompts({
         type: "confirm",
@@ -152,7 +159,7 @@ async function main() {
 
       infoTerminal(`Signature length: ${signature.length}`, signer.signerName);
       infoTerminal(`Signature:`, signer.signerName);
-      italicInfoTerminal(signature);
+      await italicInfoTerminal(signature);
       infoTerminal("========================================");
 
       infoTerminal(`Please check the payload that will be broadcasted.`);
@@ -175,7 +182,7 @@ async function main() {
       );
 
       infoTerminal("Transaction broadcasted:", "Adamik");
-      italicInfoTerminal(JSON.stringify(broadcastResponse, null, 2));
+      await italicInfoTerminal(JSON.stringify(broadcastResponse, null, 2));
       infoTerminal("========================================");
 
       const { startNewTransaction } = await prompts({

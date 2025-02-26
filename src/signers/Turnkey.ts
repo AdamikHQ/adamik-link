@@ -8,6 +8,7 @@ import {
   extractSignature,
   getCoinTypeFromDerivationPath,
   infoTerminal,
+  italicInfoTerminal,
 } from "../utils";
 import { Signer } from "./index";
 import { BaseSigner } from "./types";
@@ -141,6 +142,15 @@ export class TurnkeySigner implements BaseSigner {
         this.signerSpec.curve
       ),
     });
+
+    infoTerminal(`Signature`);
+    await italicInfoTerminal(
+      JSON.stringify(
+        { r: txSignResult.r, s: txSignResult.s, v: txSignResult.v },
+        null,
+        2
+      )
+    );
 
     return extractSignature(this.signerSpec.signatureFormat, txSignResult);
   }

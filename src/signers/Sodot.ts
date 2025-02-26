@@ -92,8 +92,9 @@ export class SodotSigner implements BaseSigner {
           "please use SODOT_EXISTING_ECDSA_KEY_IDS to be able to reuse the same keys",
           this.signerName
         );
-        italicInfoTerminal(
-          `export SODOT_EXISTING_ECDSA_KEY_IDS="${this.keyIds.join(",")}"`
+        await italicInfoTerminal(
+          `export SODOT_EXISTING_ECDSA_KEY_IDS="${this.keyIds.join(",")}"`,
+          1000
         );
         infoTerminal(`keyIds: ${this.keyIds}`, this.signerName);
       } else if (this.signerSpec.curve === AdamikCurve.ED25519) {
@@ -101,8 +102,9 @@ export class SodotSigner implements BaseSigner {
           "please use SODOT_EXISTING_ED25519_KEY_IDS to be able to reuse the same keys",
           this.signerName
         );
-        italicInfoTerminal(
-          `export SODOT_EXISTING_ED25519_KEY_IDS="${this.keyIds.join(",")}"`
+        await italicInfoTerminal(
+          `export SODOT_EXISTING_ED25519_KEY_IDS="${this.keyIds.join(",")}"`,
+          10000
         );
       }
       infoTerminal("Done creating new keypair.", this.signerName);
@@ -138,7 +140,7 @@ export class SodotSigner implements BaseSigner {
     }
 
     infoTerminal("Signature from SODOT:", this.signerName);
-    italicInfoTerminal(JSON.stringify(signature, null, 2));
+    await italicInfoTerminal(JSON.stringify(signature, null, 2));
 
     if ("signature" in signature) {
       return signature.signature;

@@ -7,10 +7,11 @@
     "start": "ts-node src/index.ts"
   },
   "dependencies": {
-    "@cosmjs/crypto": "^0.33.0",
-    "@cosmjs/encoding": "^0.33.0",
+    "@dfns/sdk": "^0.6.3",
+    "@dfns/sdk-keysigner": "^0.6.3",
     "@turnkey/sdk-server": "^2.0.1",
     "dotenv": "^16.4.7",
+    "ethers": "^6.13.5",
     "picocolors": "^1.1.1",
     "prompts": "^2.4.2"
   },
