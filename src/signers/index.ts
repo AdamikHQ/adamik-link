@@ -1,10 +1,12 @@
 import prompts from "prompts";
 import { AdamikSignerSpec } from "../adamik/types";
+import { DfnsSigner } from "./Dfns";
 import { SodotSigner } from "./Sodot";
 import { TurnkeySigner } from "./Turnkey";
 import { BaseSigner } from "./types";
 
 export enum Signer {
+  DFNS = "DFNS",
   SODOT = "SODOT",
   TURNKEY = "TURNKEY",
 }
@@ -35,6 +37,10 @@ export const signerSelector = async (
       // Should throw an error if the config is not valid.
       TurnkeySigner.isConfigValid();
       return new TurnkeySigner(chainId, signerSpec);
+    case Signer.DFNS:
+      // Should throw an error if the config is not valid.
+      // DfnsSigner.isConfigValid();
+      return new DfnsSigner(chainId, signerSpec);
     default:
       throw new Error(`Unsupported signer: ${signerName}`);
   }
