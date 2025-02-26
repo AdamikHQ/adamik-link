@@ -39,7 +39,7 @@ export const signerSelector = async (
       return new TurnkeySigner(chainId, signerSpec);
     case Signer.DFNS:
       // Should throw an error if the config is not valid.
-      // DfnsSigner.isConfigValid();
+      DfnsSigner.isConfigValid();
       return new DfnsSigner(chainId, signerSpec);
     default:
       throw new Error(`Unsupported signer: ${signerName}`);

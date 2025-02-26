@@ -39,6 +39,26 @@ export class DfnsSigner implements BaseSigner {
     this.walletId = "";
   }
 
+  static isConfigValid(): boolean {
+    if (!process.env.DFNS_CRED_ID) {
+      throw new Error("DFNS_CRED_ID is not set");
+    }
+    if (!process.env.DFNS_PRIVATE_KEY) {
+      throw new Error("DFNS_PRIVATE_KEY is not set");
+    }
+    if (!process.env.DFNS_APP_ID) {
+      throw new Error("DFNS_APP_ID is not set");
+    }
+    if (!process.env.DFNS_AUTH_TOKEN) {
+      throw new Error("DFNS_AUTH_TOKEN is not set");
+    }
+    if (!process.env.DFNS_API_URL) {
+      throw new Error("DFNS_API_URL is not set");
+    }
+
+    return true;
+  }
+
   private convertAdamikCurveToDfnsCurve(
     curve: AdamikCurve
   ): "KeyECDSAStark" | "KeyEdDSA" | "KeyECDSA" {
