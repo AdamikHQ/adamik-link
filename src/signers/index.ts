@@ -23,11 +23,7 @@ export const signerSelector = async (
         title: signer,
         value: signer,
       }))
-      .sort((a, b) => {
-        if (a.title === Signer.TURNKEY) return -1;
-        if (b.title === Signer.TURNKEY) return 1;
-        return a.title.localeCompare(b.title);
-      }),
+      .sort((a, b) => a.title.localeCompare(b.title)),
   });
 
   switch (signerName) {
