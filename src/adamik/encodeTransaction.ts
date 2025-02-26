@@ -32,13 +32,13 @@ export const encodeTransaction = async ({
     message: "What type of transaction do you want to perform?",
     choices: [
       { title: "Transfer", value: "transfer" },
-      { title: "Delegate", value: "delegate" },
+      { title: "Stake", value: "stake" },
     ],
     initial: 0,
   });
 
   let recipientAddress = "";
-  let validatorAddress = "";
+  let targetValidatorAddress = "";
 
   if (mode === "transfer") {
     const response = await prompts({
@@ -55,12 +55,12 @@ export const encodeTransaction = async ({
   } else {
     const response = await prompts({
       type: "text",
-      name: "validatorAddress",
+      name: "targetValidatorAddress",
       message: "What is the validator address you want to delegate to?",
     });
-    validatorAddress = response.validatorAddress;
+    targetValidatorAddress = response.targetValidatorAddress;
 
-    if (!validatorAddress) {
+    if (!targetValidatorAddress) {
       throw new Error("No validator address provided");
     }
   }
@@ -94,8 +94,9 @@ export const encodeTransaction = async ({
     },
   };
 
-  if (mode === "delegate") {
-    requestBody.transaction.data.validatorAddress = validatorAddress;
+  if (mode === "stake") {
+    requestBody.transaction.data.targetValidatorAddress =
+      targetValidatorAddress;
   }
 
   if (pubkey) {
