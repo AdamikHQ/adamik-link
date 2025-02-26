@@ -84,9 +84,7 @@ async function main() {
 
       infoTerminal("========================================");
 
-      infoTerminal(
-        `We will now encode a transaction simulating a transfer ...`
-      );
+      infoTerminal(`We will now prepare an unsigned transaction ...`);
 
       const { continueTransaction } = await prompts({
         type: "confirm",
@@ -109,7 +107,15 @@ async function main() {
         pubkey,
       });
 
-      infoTerminal("Transaction encoded:", "Adamik");
+      infoTerminal(
+        `${
+          transactionEncodeResponse.transaction.data.mode
+            .charAt(0)
+            .toUpperCase() +
+          transactionEncodeResponse.transaction.data.mode.slice(1)
+        } transaction encoded:`,
+        "Adamik"
+      );
       infoTerminal(
         `- Chain ID: ${transactionEncodeResponse.chainId}`,
         "Adamik"
