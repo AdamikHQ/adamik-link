@@ -62,7 +62,7 @@ async function main() {
       infoTerminal(`Encoding pubkey to address ...`, "Adamik");
       const address = await encodePubKeyToAddress(pubkey, chainId);
       infoTerminal(`Address:`, "Adamik");
-      italicInfoTerminal(address);
+      await italicInfoTerminal(address);
 
       infoTerminal("========================================");
 
@@ -128,18 +128,18 @@ async function main() {
         "Adamik"
       );
       infoTerminal(`- Transaction data:`, "Adamik");
-      italicInfoTerminal(
+      await italicInfoTerminal(
         JSON.stringify(transactionEncodeResponse.transaction.data, null, 2)
       );
       infoTerminal(`- Message to sign :`, "Adamik");
-      italicInfoTerminal(transactionEncodeResponse.transaction.encoded);
+      await italicInfoTerminal(transactionEncodeResponse.transaction.encoded);
 
       infoTerminal("========================================");
 
       infoTerminal(`We will now sign the transaction ...`);
 
       infoTerminal(`- Signer spec:\n`, "Adamik");
-      await italicInfoTerminal(JSON.stringify(signerSpec, null, 2), 2000);
+      await italicInfoTerminal(JSON.stringify(signerSpec, null, 2), 200);
 
       const { continueSigning } = await prompts({
         type: "confirm",
@@ -159,12 +159,12 @@ async function main() {
 
       infoTerminal(`Signature length: ${signature.length}`, signer.signerName);
       infoTerminal(`Signature:`, signer.signerName);
-      await italicInfoTerminal(signature);
+      await italicInfoTerminal(signature, 500);
       infoTerminal("========================================");
 
       infoTerminal(`Please check the payload that will be broadcasted.`);
       infoTerminal(`Transaction data:`, "Adamik");
-      italicInfoTerminal(
+      await italicInfoTerminal(
         JSON.stringify(
           {
             ...transactionEncodeResponse,
@@ -180,6 +180,10 @@ async function main() {
         transactionEncodeResponse,
         signature
       );
+
+      if (!broadcastResponse) {
+        throw new Error("Broadcast aborted");
+      }
 
       infoTerminal("Transaction broadcasted:", "Adamik");
       await italicInfoTerminal(JSON.stringify(broadcastResponse, null, 2));

@@ -92,7 +92,9 @@ export const infoTerminal = (message: string, source?: string) => {
     );
   } else if (source && CONSOLE_SOURCE.includes(source)) {
     console.log(
-      `${picocolors.bold(`[${source}]`)} ${picocolors.green(`${message}`)}`
+      `${picocolors.bold(`[${source.toUpperCase()}]`)} ${picocolors.green(
+        `${message}`
+      )}`
     );
   } else {
     console.log(`${picocolors.bold(`${message}`)}`);
@@ -101,15 +103,17 @@ export const infoTerminal = (message: string, source?: string) => {
 
 export const errorTerminal = (message: string, source?: string) => {
   console.log(
-    `${picocolors.bold(`[${source}]`)} ${picocolors.bgRed(`${message}`)}`
+    `${picocolors.bold(`[${source?.toUpperCase()}]`)} ${picocolors.bgRed(
+      `${message}`
+    )}`
   );
 };
 
 export const successTerminal = (message: string, source?: string) => {
-  console.log(picocolors.bgGreen(`[${source}] ${message}`));
+  console.log(picocolors.bgGreen(`[${source?.toUpperCase()}] ${message}`));
 };
 
-export const italicInfoTerminal = async (message: string, delayMs = 50) => {
+export const italicInfoTerminal = async (message: string, delayMs = 60) => {
   // Split the stringified JSON by newlines
   const lines = message.split("\n");
 
