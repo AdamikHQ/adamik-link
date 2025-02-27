@@ -32,14 +32,55 @@ export type AdamikChain = {
   signerSpec: AdamikSignerSpec;
 };
 
+export type AdamikToken = {
+  type: string;
+  id: string;
+  name: string;
+  ticker: string;
+  decimals: string;
+  contractAddress?: string;
+};
+
+export type StakingPosition = {
+  validatorAddresses: string[];
+  amount: string;
+  status: "free" | string; // Add other possible status values if known
+  completionDate: number;
+};
+
+export type StakingReward = {
+  validatorAddress: string;
+  amount: string;
+};
+
+export type TokenStakingReward = {
+  token: AdamikToken;
+  validatorAddress: string;
+  amount: string;
+};
+
 export type AdamikBalance = {
   balances: {
-    native: { available: string; total: string };
+    native: {
+      available: string;
+      unconfirmed: string;
+      total: string;
+    };
     tokens: {
       amount: string;
-      token: { id: string; name: string; ticker: string; decimals: number };
+      token: AdamikToken;
     }[];
-    staking?: any;
+    staking?: {
+      total: string;
+      locked: string;
+      unlocking: string;
+      unlocked: string;
+      positions: StakingPosition[];
+      rewards: {
+        native: StakingReward[];
+        tokens: TokenStakingReward[];
+      };
+    };
   };
 };
 
