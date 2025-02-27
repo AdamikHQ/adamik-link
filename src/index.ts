@@ -93,7 +93,7 @@ async function main() {
 
       const balanceTable = new Table({
         style: { head: ["cyan"] },
-        head: ["Asset", "Amount", "Network"],
+        head: ["Asset", "Amount", "Name"],
         chars: {
           top: "═",
           "top-mid": "╤",
@@ -186,6 +186,71 @@ async function main() {
       await italicInfoTerminal(transactionEncodeResponse.transaction.encoded);
 
       infoTerminal("========================================");
+
+      infoTerminal(`We will now sign the transaction ...`);
+
+      infoTerminal(`- Signer spec:\n`, "Adamik");
+      await italicInfoTerminal(JSON.stringify(signerSpec, null, 2), 200);
+
+      const { continueSigning } = await prompts({
+        type: "confirm",
+        name: "continueSigning",
+        message: "Do you want to continue? (No to restart)",
+        initial: true,
+      });
+
+      if (!continueSigning) {
+        infoTerminal("Signature aborted. Restarting...");
+        continue;
+      }
+
+      const signature = await signer.signTransaction(
+        transactionEncodeResponse.transaction.encoded
+      );
+
+      infoTerminal(`Signature length: ${signature.length}`, signer.signerName);
+      infoTerminal(`Signature:`, signer.signerName);
+      await italicInfoTerminal(signature, 500);
+      infoTerminal("========================================");
+
+      infoTerminal(`Please check the payload that will be broadcasted.`);
+      infoTerminal(`Transaction data:`, "Adamik");
+      await italicInfoTerminal(
+        JSON.stringify(
+          {
+            ...transactionEncodeResponse,
+            signature: signature,
+          },
+          null,
+          2
+        )
+      );
+
+      const broadcastResponse = await broadcastTransaction(
+        chainId,
+        transactionEncodeResponse,
+        signature
+      );
+
+      if (!broadcastResponse) {
+        throw new Error("Broadcast aborted");
+      }
+
+      infoTerminal("Transaction broadcasted:", "Adamik");
+      await italicInfoTerminal(JSON.stringify(broadcastResponse, null, 2));
+      infoTerminal("========================================");
+
+      const { startNewTransaction } = await prompts({
+        type: "confirm",
+        name: "startNewTransaction",
+        message: "Transaction completed. Start a new one? (No to exit)",
+        initial: true,
+      });
+
+      if (!startNewTransaction) {
+        infoTerminal("Exiting script. Goodbye!");
+        process.exit(0);
+      }
     } catch (error) {
       if (typeof error === "string") {
         errorTerminal(error);
