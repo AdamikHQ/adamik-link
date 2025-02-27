@@ -10,6 +10,7 @@
     "@dfns/sdk": "^0.6.3",
     "@dfns/sdk-keysigner": "^0.6.3",
     "@turnkey/sdk-server": "^2.0.1",
+    "cli-table3": "^0.6.5",
     "dotenv": "^16.4.7",
     "ethers": "^6.13.5",
     "picocolors": "^1.1.1",

@@ -14,13 +14,35 @@ import {
   infoTerminal,
   italicInfoTerminal,
 } from "./utils";
+import Table from "cli-table3";
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 
 async function main() {
+  // Add ASCII art banner
+  console.log(
+    picocolors.cyan(`
+    █████╗ ██████╗  █████╗ ███╗   ███╗██╗██╗  ██╗      ██╗     ██╗███╗   ██╗██╗  ██╗
+   ██╔══██╗██╔══██╗██╔══██╗████╗ ████║██║██║ ██╔╝      ██║     ██║████╗  ██║██║ ██╔╝
+   ███████║██║  ██║███████║██╔████╔██║██║█████╔╝       ██║     ██║██╔██╗ ██║█████╔╝ 
+   ██╔══██║██║  ██║██╔══██║██║╚██╔╝██║██║██╔═██╗       ██║     ██║██║╚██╗██║██╔═██╗ 
+   ██║  ██║██████╔╝██║  ██║██║ ╚═╝ ██║██║██║  ██╗      ███████╗██║██║ ╚████║██║  ██╗
+   ╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝  ╚═╝      ╚══════╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝
+
+    ${picocolors.gray("┌" + "─".repeat(74) + "┐")}
+    ${
+      picocolors.gray("│") +
+      picocolors.bold(
+        picocolors.yellow(
+          "               60+ NETWORKS - ANY SIGNERS - ANY TRANSACTIONS              "
+        )
+      ) +
+      picocolors.gray("│")
+    }
+    ${picocolors.gray("└" + "─".repeat(74) + "┘")}\n`)
+  );
+
   while (true) {
     try {
-      infoTerminal("========================================");
-
       const { startProcess } = await prompts({
         type: "confirm",
         name: "startProcess",
@@ -36,10 +58,10 @@ async function main() {
       infoTerminal("Getting chains ...", "Adamik");
       const { chains, chainId, signerSpec } = await adamikGetChains();
 
-      infoTerminal(`Selected chain: ${chainId}`, "Adamik");
-      infoTerminal(`- Name: ${chains[chainId].name}`, "Adamik");
-      infoTerminal(`- Ticker: ${chains[chainId].ticker}`, "Adamik");
-      infoTerminal(`- Decimals: ${chains[chainId].decimals}`, "Adamik");
+      if (!chainId) {
+        infoTerminal("Chain selection cancelled. Restarting...");
+        continue;
+      }
 
       infoTerminal("\n========================================");
 
@@ -68,26 +90,55 @@ async function main() {
 
       infoTerminal(`Fetching balance ...`, "Adamik");
       const balance = await getAccountState(chainId, address);
-      infoTerminal(`Balance:`, "Adamik");
-      console.log(
-        `\t- ${picocolors.cyan(
+
+      const balanceTable = new Table({
+        style: { head: ["cyan"] },
+        head: ["Asset", "Amount", "Network"],
+        chars: {
+          top: "═",
+          "top-mid": "╤",
+          "top-left": "╔",
+          "top-right": "╗",
+          bottom: "═",
+          "bottom-mid": "╧",
+          "bottom-left": "╚",
+          "bottom-right": "╝",
+          left: "║",
+          "left-mid": "╟",
+          mid: "─",
+          "mid-mid": "┼",
+          right: "║",
+          "right-mid": "╢",
+          middle: "│",
+        },
+      });
+
+      // Add native balance
+      balanceTable.push([
+        picocolors.bold(chains[chainId].ticker),
+        picocolors.cyan(
           amountToMainUnit(
             balance.balances.native.total,
             chains[chainId].decimals
           )
-        )} ${picocolors.bold(chains[chainId].ticker)} - ${picocolors.italic(
-          chains[chainId].name
-        )}`
-      );
-      balance.balances.tokens?.forEach((token) => {
-        console.log(
-          `\t- ${picocolors.cyan(
-            amountToMainUnit(token.amount, token.token.decimals)
-          )} ${picocolors.bold(token.token.ticker)} - ${picocolors.italic(
-            token.token.name
-          )}`
-        );
-      });
+        ),
+        picocolors.italic(chains[chainId].name),
+      ]);
+
+      // Add token balances if they exist
+      if (balance.balances.tokens && balance.balances.tokens.length > 0) {
+        balance.balances.tokens.forEach((token) => {
+          balanceTable.push([
+            picocolors.bold(token.token.ticker),
+            picocolors.cyan(
+              amountToMainUnit(token.amount, token.token.decimals)
+            ),
+            picocolors.italic(token.token.name),
+          ]);
+        });
+      }
+
+      console.log("\n" + balanceTable.toString() + "\n");
 
       infoTerminal("========================================");
 
@@ -135,85 +186,13 @@ async function main() {
       await italicInfoTerminal(transactionEncodeResponse.transaction.encoded);
 
       infoTerminal("========================================");
-
-      infoTerminal(`We will now sign the transaction ...`);
-
-      infoTerminal(`- Signer spec:\n`, "Adamik");
-      await italicInfoTerminal(JSON.stringify(signerSpec, null, 2), 200);
-
-      const { continueSigning } = await prompts({
-        type: "confirm",
-        name: "continueSigning",
-        message: "Do you want to continue? (No to restart)",
-        initial: true,
-      });
-
-      if (!continueSigning) {
-        infoTerminal("Signature aborted. Restarting...");
-        continue;
-      }
-
-      const signature = await signer.signTransaction(
-        transactionEncodeResponse.transaction.encoded
-      );
-
-      infoTerminal(`Signature length: ${signature.length}`, signer.signerName);
-      infoTerminal(`Signature:`, signer.signerName);
-      await italicInfoTerminal(signature, 500);
-      infoTerminal("========================================");
-
-      infoTerminal(`Please check the payload that will be broadcasted.`);
-      infoTerminal(`Transaction data:`, "Adamik");
-      await italicInfoTerminal(
-        JSON.stringify(
-          {
-            ...transactionEncodeResponse,
-            signature: signature,
-          },
-          null,
-          2
-        )
-      );
-
-      const broadcastResponse = await broadcastTransaction(
-        chainId,
-        transactionEncodeResponse,
-        signature
-      );
-
-      if (!broadcastResponse) {
-        throw new Error("Broadcast aborted");
-      }
-
-      infoTerminal("Transaction broadcasted:", "Adamik");
-      await italicInfoTerminal(JSON.stringify(broadcastResponse, null, 2));
-      infoTerminal("========================================");
-
-      const { startNewTransaction } = await prompts({
-        type: "confirm",
-        name: "startNewTransaction",
-        message: "Transaction completed. Start a new one? (No to exit)",
-        initial: true,
-      });
-
-      if (!startNewTransaction) {
-        infoTerminal("Exiting script. Goodbye!");
-        process.exit(0);
-      }
     } catch (error) {
-      errorTerminal("An error occurred:", "Main");
-      console.error(error);
-
-      const { retryAfterError } = await prompts({
-        type: "confirm",
-        name: "retryAfterError",
-        message: "An error occurred. Would you like to retry? (No to exit)",
-        initial: true,
-      });
-
-      if (!retryAfterError) {
-        process.exit(1);
+      if (typeof error === "string") {
+        errorTerminal(error);
+      } else {
+        errorTerminal(String(error));
       }
+      continue;
     }
   }
 }
