@@ -1,3 +1,4 @@
+import * as utils from "@noble/curves/abstract/utils";
 import {
   AdamikCurve,
   AdamikHashFunction,
@@ -6,12 +7,11 @@ import {
 
 import { DfnsApiClient } from "@dfns/sdk";
 import { AsymmetricKeySigner } from "@dfns/sdk-keysigner";
-import { keccak256, sha256 } from "ethers";
+import { ethers, sha256 } from "ethers";
 import { extractSignature, infoTerminal, italicInfoTerminal } from "../utils";
 import { BaseSigner } from "./types";
 
 export class DfnsSigner implements BaseSigner {
-  private signer: AsymmetricKeySigner;
   private dfnsApi: DfnsApiClient;
   public chainId: string;
   public signerSpec: AdamikSignerSpec;
@@ -34,7 +34,6 @@ export class DfnsSigner implements BaseSigner {
       signer,
     });
 
-    this.signer = signer;
     this.dfnsApi = dfnsApi;
     this.walletId = "";
   }
@@ -122,6 +121,8 @@ export class DfnsSigner implements BaseSigner {
   }
 
   private async signHash(hash: string) {
+    await italicInfoTerminal(JSON.stringify(hash, null, 2));
+
     const signature = await this.dfnsApi.wallets.generateSignature({
       body: {
         kind: "Hash",
@@ -145,11 +146,55 @@ export class DfnsSigner implements BaseSigner {
     return signature;
   }
 
+  private keccak256FromHex(hexString: string) {
+    if (!hexString.startsWith("0x")) {
+      hexString = "0x" + hexString;
+    }
+
+    const bytes = ethers.getBytes(hexString);
+    const hash = ethers.keccak256(bytes);
+
+    return hash;
+  }
+
+  private MAX_VALUE: bigint = BigInt(
+    "0x800000000000000000000000000000000000000000000000000000000000000"
+  );
+
+  private hex0xToBytes(hex: string): Uint8Array {
+    if (typeof hex === "string") {
+      hex = hex.replace(/^0x/i, ""); // allow 0x prefix
+      if (hex.length & 1) hex = "0" + hex; // allow unpadded hex
+    }
+    return utils.hexToBytes(hex);
+  }
+
+  private ensureBytes(hex: string): Uint8Array {
+    return utils.ensureBytes(
+      "",
+      typeof hex === "string" ? this.hex0xToBytes(hex) : hex
+    );
+  }
+
+  private checkMessage(msgHash: string) {
+    const bytes = this.ensureBytes(msgHash);
+    const num = utils.bytesToNumberBE(bytes);
+    if (num >= this.MAX_VALUE)
+      throw new Error(`msgHash should be [0, ${this.MAX_VALUE})`);
+    return bytes;
+  }
+
   private async hashTransactionPayload(
     hashAlgo: AdamikHashFunction,
     curve: AdamikCurve,
     hashTransactionPayload: string
   ) {
+    if (curve === AdamikCurve.STARK) {
+      return Buffer.from(this.checkMessage(hashTransactionPayload)).toString(
+        "hex"
+      );
+    }
+
     if (curve !== AdamikCurve.SECP256K1) {
       return hashTransactionPayload.startsWith("0x")
         ? hashTransactionPayload
@@ -160,7 +205,7 @@ export class DfnsSigner implements BaseSigner {
       case AdamikHashFunction.SHA256:
         return sha256(Buffer.from(hashTransactionPayload, "hex"));
       case AdamikHashFunction.KECCAK256:
-        return keccak256(Buffer.from(hashTransactionPayload, "hex"));
+        return this.keccak256FromHex(hashTransactionPayload);
       default:
         throw new Error(`Unsupported hash function: ${hashAlgo} - ${curve}`);
     }

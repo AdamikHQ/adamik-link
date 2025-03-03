@@ -10,8 +10,9 @@ A TypeScript-based CLI tool for interacting with Adamik. This tool allows you to
 - Encode and sign transactions
 - Broadcast signed transactions
 - Support for multiple signing providers:
-  - Sodot: A multi-party computation (MPC) based signing solution
-  - Turnkey: A institutional-grade wallet infrastructure
+  - Dfns
+  - Sodot
+  - Turnkey
 
 ## Prerequisites
 
@@ -80,6 +81,16 @@ TURNKEY_ORGANIZATION_ID="<turnkey-organization-id>"
 TURNKEY_WALLET_ID="<turnkey-wallet-id>"
 ```
 
+#### For Dfns Signer
+
+```
+DFNS_CRED_ID="<Dfns-Credential-ID>"
+DFNS_PRIVATE_KEY="<Dfns-Private-Key>"
+DFNS_APP_ID="<Dfns-App-ID>"
+DFNS_AUTH_TOKEN="<Dfns-Auth-Token>"
+DFNS_API_URL="<Dfns-API-URL>"
+```
+
 ## Usage
 
 1. Start the CLI tool:
@@ -101,6 +112,7 @@ yarn start
 
 ## Supported Signers
 
+- [Dfns](https://www.dfns.co/)
 - [Sodot](https://www.sodot.dev/)
 - [Turnkey](https://www.turnkey.com/)
 
@@ -116,5 +128,6 @@ yarn start
 For any issues or questions:
 
 - Adamik API issues: Contact Adamik support
+- Dfns signer issues: Contact Dfns support
 - Sodot signer issues: Contact Sodot support
 - Turnkey signer issues: Contact Turnkey support

@@ -5,6 +5,7 @@ import {
   errorTerminal,
   infoTerminal,
 } from "../utils";
+import { deployAccount } from "./deployAccount";
 import {
   AdamikAPIError,
   AdamikBalance,
@@ -124,6 +125,29 @@ export const encodeTransaction = async ({
 
     infoTerminal(" and response :", "Adamik");
     infoTerminal(JSON.stringify(transactionEncodeResponse, null, 2), "Adamik");
+
+    if (
+      transactionEncodeResponse.status.errors[0].message ===
+      "Sender account does not exist"
+    ) {
+      const { continueDeploy } = await prompts({
+        type: "confirm",
+        name: "continueDeploy",
+        message:
+          "It's seems that account is not deployed, do you want to craft a deploy transaction (will not be broadcasted yet) ?",
+        initial: true,
+      });
+
+      if (continueDeploy) {
+        const deployTransactionEncodeResponse = await deployAccount({
+          chainId,
+          senderAddress,
+          pubkey,
+        });
+
+        return deployTransactionEncodeResponse;
+      }
+    }
 
     throw new Error(
       transactionEncodeResponse.status.errors[0].message ||

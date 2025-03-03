@@ -14,6 +14,9 @@ importers:
       '@dfns/sdk-keysigner':
         specifier: ^0.6.3
         version: 0.6.3(@dfns/sdk@0.6.3)
+      '@noble/curves':
+        specifier: ^1.8.1
+        version: 1.8.1
       '@turnkey/sdk-server':
         specifier: ^2.0.1
         version: 2.0.1(react-dom@19.0.0(react@19.0.0))(react@19.0.0)

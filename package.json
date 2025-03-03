@@ -9,6 +9,7 @@
   "dependencies": {
     "@dfns/sdk": "^0.6.3",
     "@dfns/sdk-keysigner": "^0.6.3",
+    "@noble/curves": "^1.8.1",
     "@turnkey/sdk-server": "^2.0.1",
     "cli-table3": "^0.6.5",
     "dotenv": "^16.4.7",
