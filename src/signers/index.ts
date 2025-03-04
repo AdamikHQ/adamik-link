@@ -19,7 +19,7 @@ export const signerSelector = async (
     type: "select",
     name: "signerName",
     message:
-      "Please, select a signer, be sure to have properly set .env.local for the corresponding singer",
+      "Please, select a signer, be sure to have properly set .env.local for the corresponding signer",
     choices: Object.values(Signer)
       .map((signer) => ({
         title: signer,
