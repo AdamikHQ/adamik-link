@@ -114,12 +114,17 @@ export type AdamikEncodePubkeyToAddressResponse = {
   }[];
 };
 
+export type ErrorMsg = {
+  message: string;
+};
+
+export type Status = {
+  errors: ErrorMsg[];
+  warnings: ErrorMsg[];
+};
+
 export type AdamikAPIError<T> = T & {
-  status?: {
-    errors: {
-      message: string;
-    }[];
-  };
+  status: Status;
 };
 
 export type AdamikTransactionDetails = {
@@ -163,9 +168,5 @@ export type AdamikTransactionDetails = {
     };
     raw?: unknown;
   };
-  status: {
-    errors: {
-      message: string;
-    }[];
-  };
+  status: Status;
 };

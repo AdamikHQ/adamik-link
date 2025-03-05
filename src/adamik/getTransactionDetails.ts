@@ -27,18 +27,12 @@ export const getTransactionDetails = async (
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      errorTerminal(
-        `API Error: ${error?.message || response.statusText}`,
-        "Adamik"
-      );
       return;
     }
 
     const result = await response.json();
     return result;
   } catch (e: any) {
-    errorTerminal(e.message, "Adamik");
     return;
   }
 };
