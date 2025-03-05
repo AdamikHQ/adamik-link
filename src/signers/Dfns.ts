@@ -121,12 +121,14 @@ export class DfnsSigner implements BaseSigner {
   }
 
   private async signHash(hash: string) {
-    await italicInfoTerminal(JSON.stringify(hash, null, 2));
+    const formattedHash = hash.startsWith("0x") ? hash : "0x" + hash;
+
+    await italicInfoTerminal(JSON.stringify(formattedHash, null, 2));
 
     const signature = await this.dfnsApi.wallets.generateSignature({
       body: {
         kind: "Hash",
-        hash,
+        hash: formattedHash,
       },
       walletId: this.walletId,
     });
