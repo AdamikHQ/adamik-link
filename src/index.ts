@@ -15,6 +15,7 @@ import {
   italicInfoTerminal,
 } from "./utils";
 import Table from "cli-table3";
+import { getTransactionDetails } from "./adamik/getTransactionDetails";
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 
 async function main() {
@@ -355,6 +356,27 @@ async function main() {
       infoTerminal("Transaction broadcasted:", "Adamik");
       await italicInfoTerminal(JSON.stringify(broadcastResponse, null, 2));
       infoTerminal("========================================");
+
+      // Add prompt to check transaction details
+      const { checkDetails } = await prompts({
+        type: "confirm",
+        name: "checkDetails",
+        message: "Would you like to check the transaction details?",
+        initial: true,
+      });
+
+      if (checkDetails && broadcastResponse.hash) {
+        infoTerminal("Fetching transaction details...", "Adamik");
+        const txDetails = await getTransactionDetails(
+          chainId,
+          broadcastResponse.hash
+        );
+        if (txDetails) {
+          infoTerminal("Transaction details:", "Adamik");
+          await italicInfoTerminal(JSON.stringify(txDetails, null, 2));
+          infoTerminal("========================================");
+        }
+      }
 
       const { startNewTransaction } = await prompts({
         type: "confirm",

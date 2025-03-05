@@ -121,3 +121,51 @@ export type AdamikAPIError<T> = T & {
     }[];
   };
 };
+
+export type AdamikTransactionDetails = {
+  transaction: {
+    parsed?: {
+      id: string;
+      mode: string;
+      tokenId?: string;
+      state: string;
+      blockHeight?: string;
+      timestamp?: number;
+      fees: {
+        amount: string;
+        ticker?: string;
+      };
+      gas?: string;
+      nonce?: string;
+      memo?: string;
+      senders?: {
+        address: string;
+        amount: string;
+        ticker?: string;
+      }[];
+      recipients?: {
+        address: string;
+        amount: string;
+        ticker?: string;
+      }[];
+      validators?: {
+        source?: {
+          address: string;
+          amount: string;
+          ticker?: string;
+        };
+        target?: {
+          address: string;
+          amount: string;
+          ticker?: string;
+        };
+      };
+    };
+    raw?: unknown;
+  };
+  status: {
+    errors: {
+      message: string;
+    }[];
+  };
+};
