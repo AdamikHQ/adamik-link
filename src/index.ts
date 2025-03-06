@@ -114,6 +114,11 @@ async function main() {
         pubkey,
       });
 
+      if (!transactionEncodeResponse) {
+        errorTerminal("Failed to encode transaction", "Adamik");
+        continue;
+      }
+
       infoTerminal(
         `${
           transactionEncodeResponse.transaction.data.mode

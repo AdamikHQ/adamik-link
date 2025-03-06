@@ -4,13 +4,14 @@
   "private": true,
   "scripts": {
     "build": "tsc",
-    "start": "ts-node src/index.ts"
+    "start": "ts-node src/index.ts",
+    "transaction": "ts-node src/scripts/testTransactions.ts"
   },
   "dependencies": {
     "@dfns/sdk": "^0.6.3",
     "@dfns/sdk-keysigner": "^0.6.3",
     "@noble/curves": "^1.8.1",
-    "@turnkey/sdk-server": "^2.0.1",
+    "@turnkey/sdk-server": "^2.2.0",
     "cli-table3": "^0.6.5",
     "date-fns": "^4.1.0",
     "dotenv": "^16.4.7",

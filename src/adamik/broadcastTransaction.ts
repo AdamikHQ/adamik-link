@@ -1,6 +1,10 @@
 import prompts from "prompts";
 import { errorTerminal, infoTerminal } from "../utils";
-import { AdamikTransactionEncodeResponse } from "./types";
+import {
+  AdamikAPIError,
+  AdamikBroadcastResponse,
+  AdamikTransactionEncodeResponse,
+} from "./types";
 
 export const broadcastTransaction = async (
   chainId: string,
@@ -42,7 +46,8 @@ export const broadcastTransaction = async (
   );
 
   try {
-    const result = await broadcastResponse.json();
+    const result =
+      (await broadcastResponse.json()) as AdamikAPIError<AdamikBroadcastResponse>;
 
     return result;
   } catch (e: any) {

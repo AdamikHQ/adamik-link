@@ -305,7 +305,7 @@ export class SodotSigner implements BaseSigner {
         return undefined;
       }
 
-      const signature: SodotSignatureResponse = await response.json();
+      const signature = (await response.json()) as SodotSignatureResponse;
       return signature;
     } catch (e) {
       errorTerminal(

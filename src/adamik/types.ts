@@ -170,3 +170,8 @@ export type AdamikTransactionDetails = {
   };
   status: Status;
 };
+
+export type AdamikBroadcastResponse = {
+  chainId: string;
+  hash: string;
+};

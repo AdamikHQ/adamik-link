@@ -1,12 +1,11 @@
 import { errorTerminal } from "../utils";
+import { AdamikAPIError, AdamikTransactionEncodeResponse } from "./types";
 
 export const deployAccount = async ({
   chainId,
-  senderAddress,
   pubkey,
 }: {
   chainId: string;
-  senderAddress: string;
   pubkey?: string;
 }) => {
   const requestBody: any = {
@@ -31,7 +30,8 @@ export const deployAccount = async ({
     }
   );
 
-  const deployTransactionEncodeResponse = await deployTransactionEncode.json();
+  const deployTransactionEncodeResponse =
+    (await deployTransactionEncode.json()) as AdamikAPIError<AdamikTransactionEncodeResponse>;
 
   deployTransactionEncodeResponse.status.errors.forEach((error: any) => {
     errorTerminal(error.message, "Adamik");

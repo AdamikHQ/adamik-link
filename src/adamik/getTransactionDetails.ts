@@ -1,5 +1,5 @@
 import { errorTerminal } from "../utils";
-import { AdamikTransactionDetails } from "./types";
+import { AdamikAPIError, AdamikTransactionDetails } from "./types";
 
 export const getTransactionDetails = async (
   chainId: string,
@@ -30,7 +30,8 @@ export const getTransactionDetails = async (
       return;
     }
 
-    const result = await response.json();
+    const result =
+      (await response.json()) as AdamikAPIError<AdamikTransactionDetails>;
     return result;
   } catch (e: any) {
     return;

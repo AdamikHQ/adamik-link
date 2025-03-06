@@ -1,5 +1,5 @@
 import Table from "cli-table3";
-import { formatDistanceToNow, fromUnixTime } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import picocolors from "picocolors";
 import { getTransactionDetails } from "../adamik/getTransactionDetails";
 import { AdamikChain, ErrorMsg } from "../adamik/types";
@@ -44,8 +44,8 @@ export const transactionDetailView = async (
             // Handle timestamp as a number directly
             const timestamp =
               typeof parsed.timestamp === "string"
-                ? fromUnixTime(Number(parsed.timestamp))
-                : fromUnixTime(parsed.timestamp);
+                ? new Date(Number(parsed.timestamp))
+                : new Date(parsed.timestamp);
 
             if (!isNaN(timestamp.getTime())) {
               timestampValue = formatDistanceToNow(timestamp, {

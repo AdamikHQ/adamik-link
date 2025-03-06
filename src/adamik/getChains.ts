@@ -11,8 +11,9 @@ export const adamikGetChains = async () => {
       },
     }
   );
-  const chains: Record<string, AdamikChain> = (await fetchAllChains.json())
-    .chains;
+  const chains: Record<string, AdamikChain> = (
+    (await fetchAllChains.json()) as { chains: Record<string, AdamikChain> }
+  ).chains;
 
   const { chainId } = await prompts({
     type: "autocomplete",

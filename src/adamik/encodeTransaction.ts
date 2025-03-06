@@ -26,7 +26,7 @@ export const encodeTransaction = async ({
   ticker: string;
   balance: AdamikBalance;
   pubkey?: string;
-}) => {
+}): Promise<AdamikTransactionEncodeResponse | undefined> => {
   const { mode } = await prompts({
     type: "select",
     name: "mode",
@@ -117,7 +117,7 @@ export const encodeTransaction = async ({
   );
 
   const transactionEncodeResponse: AdamikAPIError<AdamikTransactionEncodeResponse> =
-    await postTransactionEncode.json();
+    (await postTransactionEncode.json()) as AdamikAPIError<AdamikTransactionEncodeResponse>;
 
   if (transactionEncodeResponse.status.errors.length > 0) {
     errorTerminal("Transaction encoding failed, check payload :", "Adamik");
@@ -141,7 +141,6 @@ export const encodeTransaction = async ({
       if (continueDeploy) {
         const deployTransactionEncodeResponse = await deployAccount({
           chainId,
-          senderAddress,
           pubkey,
         });
 
