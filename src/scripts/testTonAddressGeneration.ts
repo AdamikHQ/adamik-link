@@ -51,17 +51,33 @@ async function testTonAddressGeneration() {
     // Method 2: Using TonWeb
     infoTerminal("\n📱 Method 2: Using TonWeb");
     const words = process.env.UNSECURE_LOCAL_SEED!.split(" ");
-    console.log("Number of words:", words.length);
 
     try {
-      // Use ethers for sha256 since we know it works
-      const seed = ethers
-        .sha256(Buffer.from(process.env.UNSECURE_LOCAL_SEED!, "utf8"))
-        .slice(2); // remove '0x' prefix
+      // Log intermediate values to compare
+      const seedPhrase = process.env.UNSECURE_LOCAL_SEED!;
+      console.log("\nDerivation details:");
+      console.log("Seed phrase:", seedPhrase);
 
-      const keyPair = TonWeb.utils.nacl.sign.keyPair.fromSeed(
-        Buffer.from(seed, "hex").slice(0, 32)
+      // LocalSigner method
+      const localSeed = ethers.sha256(Buffer.from(seedPhrase));
+      console.log("LocalSigner seed:", localSeed);
+
+      // TonWeb method - try their exact method
+      console.log("\nDetailed TonWeb derivation:");
+      const tonSeed = await tonMnemonic.mnemonicToSeed(words);
+      console.log("TonWeb raw seed:", Buffer.from(tonSeed).toString("hex"));
+
+      // Show exactly how TonWeb creates the keypair
+      const keyPair = TonWeb.utils.nacl.sign.keyPair.fromSeed(tonSeed);
+      console.log(
+        "TonWeb seed used for keypair:",
+        Buffer.from(tonSeed).toString("hex")
       );
+      console.log(
+        "TonWeb keypair generation method:",
+        "nacl.sign.keyPair.fromSeed(seed)"
+      );
+
       const tonweb = new TonWeb();
 
       console.log(
