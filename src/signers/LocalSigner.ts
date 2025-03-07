@@ -5,12 +5,12 @@ import {
   AdamikSignerSpec,
 } from "../adamik/types";
 import { extractSignature, infoTerminal } from "../utils";
-import { BaseSigner, SignKeyPair } from "./types";
-import * as nacl from "tweetnacl"; // Changed to namespace import
+import { BaseSigner } from "./types";
+import * as nacl from "tweetnacl";
 
 export class LocalSigner implements BaseSigner {
   private wallet: HDNodeWallet | null = null;
-  private ed25519KeyPair: SignKeyPair | null = null;
+  private ed25519KeyPair: nacl.SignKeyPair | null = null;
   public signerName = "LOCAL_UNSECURE";
 
   constructor(public chainId: string, public signerSpec: AdamikSignerSpec) {
@@ -41,7 +41,7 @@ export class LocalSigner implements BaseSigner {
     return this.wallet;
   }
 
-  private async getEd25519KeyPair(): Promise<SignKeyPair> {
+  private async getEd25519KeyPair(): Promise<nacl.SignKeyPair> {
     if (!this.ed25519KeyPair) {
       // For ED25519, we should also respect the derivation path
       // but since tweetnacl doesn't support HD wallets directly,

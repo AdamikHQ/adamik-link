@@ -8,8 +8,3 @@ export interface BaseSigner {
   getPubkey(): Promise<string>;
   signTransaction(encodedMessage: string): Promise<string>;
 }
-
-export interface SignKeyPair {
-  publicKey: Uint8Array;
-  secretKey: Uint8Array;
-}
