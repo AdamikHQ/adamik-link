@@ -115,6 +115,23 @@ yarn start
 - [Dfns](https://www.dfns.co/)
 - [Sodot](https://www.sodot.dev/)
 - [Turnkey](https://www.turnkey.com/)
+- Local Mnemonic (Development Only)
+
+### ⚠️ Local Mnemonic Signer
+
+```env
+UNSECURE_LOCAL_SEED="A 12 WORDS BIP 39 SEED PHRASE"
+```
+
+**WARNING: The Local Mnemonic signer is for development and testing purposes only!**
+
+This signer allows you to use a BIP39 mnemonic phrase directly for signing transactions. While convenient for development, it is **NOT SECURE** for production use because:
+
+- The mnemonic is stored in plain text in your environment file
+- There is no hardware security module (HSM) protection
+- Your private keys are exposed in the application's memory
+
+For production environments, always use one of the secure signing providers listed above (Dfns, Sodot, or Turnkey).
 
 ## Important Notes
 
