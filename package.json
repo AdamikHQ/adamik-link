@@ -6,7 +6,7 @@
     "build": "tsc",
     "start": "tsx src/index.ts",
     "transaction": "tsx src/scripts/testTransactions.ts",
-    "test": "mocha --timeout 10000 -r tsx test/**/ethereum.spec.ts"
+    "test": "mocha --timeout 10000 -r tsx test/**/*.spec.ts"
   },
   "dependencies": {
     "@dfns/sdk": "^0.6.3",
