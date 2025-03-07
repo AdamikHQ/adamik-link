@@ -67,6 +67,7 @@ export class TurnkeySigner implements BaseSigner {
   }
 
   async getPubkey(): Promise<string> {
+    console.log("TURNKEY WALLET ID", process.env.TURNKEY_WALLET_ID);
     const { accounts } = await this.turnkeyClient
       .apiClient()
       .getWalletAccounts({
@@ -103,7 +104,6 @@ export class TurnkeySigner implements BaseSigner {
 
       return createAccount.addresses[0];
     }
-
     this.pubKey = accountCompressed.address;
 
     return accountCompressed.address;

@@ -1,0 +1,13 @@
+diff --git a/src/psbt.js b/src/psbt.js
+index b071f374f9d9b2a0bb6f4385550ace3166ea16f8..bd99daf6d11cf9779c164c09f1d35378264358b5 100644
+--- a/src/psbt.js
++++ b/src/psbt.js
+@@ -1331,7 +1331,7 @@ function getTaprootHashesForSig(
+   if (input.tapInternalKey && !tapLeafHashToSign) {
+     const outputKey =
+       getPrevoutTaprootKey(inputIndex, input, cache) || Buffer.from([]);
+-    if ((0, bip371_1.toXOnly)(pubkey).equals(outputKey)) {
++    if (Buffer.from((0, bip371_1.toXOnly)(pubkey)).equals(outputKey)) {
+       const tapKeyHash = unsignedTx.hashForWitnessV1(
+         inputIndex,
+         signingScripts,
