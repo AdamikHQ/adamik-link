@@ -1,0 +1,54 @@
+name: Test Runner
+
+on:
+  cron:
+    - "5 8 * * *"
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+          run_install: false
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run tests
+        id: run-tests
+        env:
+          ADAMIK_API_KEY: ${{ secrets.ADAMIK_API_KEY }}
+          STARKNET_PRIVATE_KEY: ${{ secrets.STARKNET_PRIVATE_KEY }}
+          UNSECURE_LOCAL_SEED: ${{ secrets.UNSECURE_LOCAL_SEED }}
+        run: |
+          pnpm run test
+        continue-on-error: true # Continue to next step even if tests fail
+
+      - name: Check test results
+        run: |
+          if [ "${{ steps.run-tests.outcome }}" == "failure" ]; then
+            echo "Tests have failed"
+            echo "TESTS_FAILED=true" >> $GITHUB_ENV
+          else
+            echo "All tests passed"
+            echo "TESTS_FAILED=false" >> $GITHUB_ENV
+          fi
+
+      # Fail the workflow if tests failed
+      - name: Exit with test status
+        if: env.TESTS_FAILED == 'true'
+        run: exit 1
