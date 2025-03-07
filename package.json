@@ -11,13 +11,16 @@
     "@dfns/sdk": "^0.6.3",
     "@dfns/sdk-keysigner": "^0.6.3",
     "@noble/curves": "^1.8.1",
+    "@noble/ed25519": "^2.2.3",
     "@turnkey/sdk-server": "^2.2.0",
     "cli-table3": "^0.6.5",
     "date-fns": "^4.1.0",
     "dotenv": "^16.4.7",
     "ethers": "^6.13.5",
+    "noble-ed25519": "^1.2.6",
     "picocolors": "^1.1.1",
-    "prompts": "^2.4.2"
+    "prompts": "^2.4.2",
+    "tweetnacl": "^1.0.3"
   },
   "devDependencies": {
     "@types/node": "^20.8.2",

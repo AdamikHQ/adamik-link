@@ -1,12 +1,14 @@
 import prompts from "prompts";
 import { AdamikSignerSpec } from "../adamik/types";
 import { DfnsSigner } from "./Dfns";
+import { LocalSigner } from "./LocalSigner";
 import { SodotSigner } from "./Sodot";
 import { TurnkeySigner } from "./Turnkey";
 import { BaseSigner } from "./types";
 
 export enum Signer {
   DFNS = "DFNS",
+  LOCAL = "LOCAL MNEMONIC (UNSECURE)",
   SODOT = "SODOT",
   TURNKEY = "TURNKEY",
 }
@@ -24,8 +26,11 @@ export const signerSelector = async (
       .map((signer) => ({
         title: signer,
         value: signer,
+        disabled: signer === Signer.LOCAL && !process.env.UNSECURE_LOCAL_SEED,
       }))
       .sort((a, b) => {
+        if (a.title === Signer.LOCAL) return 1;
+        if (b.title === Signer.LOCAL) return -1;
         if (a.title === Signer.SODOT) return -1;
         if (b.title === Signer.SODOT) return 1;
         return a.title.localeCompare(b.title);
@@ -33,6 +38,9 @@ export const signerSelector = async (
   });
 
   switch (signerName) {
+    case Signer.LOCAL:
+      LocalSigner.isConfigValid();
+      return new LocalSigner(chainId, signerSpec);
     case Signer.SODOT:
       // Should throw an error if the config is not valid.
       SodotSigner.isConfigValid();
