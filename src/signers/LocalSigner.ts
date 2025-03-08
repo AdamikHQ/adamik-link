@@ -52,9 +52,7 @@ export class LocalSigner implements BaseSigner {
     if (!this.wallet) {
       // Create master node from mnemonic
       const masterNode = ethers.HDNodeWallet.fromPhrase(
-        process.env.UNSECURE_LOCAL_SEED!,
-        "", // Empty password
-        "m" // Start from master path
+        process.env.UNSECURE_LOCAL_SEED!
       );
 
       // Derive from master using coinType
@@ -72,11 +70,8 @@ export class LocalSigner implements BaseSigner {
         const tonMnemonic = require("tonweb-mnemonic");
         const words = process.env.UNSECURE_LOCAL_SEED!.split(" ");
 
-        // Use password if provided in environment
-        const password = process.env.TON_SEED_PASSWORD || "";
-
         // This follows the exact TON seed generation process
-        const seed = await tonMnemonic.mnemonicToSeed(words, password);
+        const seed = await tonMnemonic.mnemonicToSeed(words);
         this.ed25519KeyPair = nacl.sign.keyPair.fromSeed(seed);
       } else {
         // For other ED25519 chains, use standard BIP39/SLIP-0010
@@ -102,9 +97,7 @@ export class LocalSigner implements BaseSigner {
   private async getStarkPrivateKey(): Promise<string> {
     if (!this.starkPrivateKey) {
       const masterNode = ethers.HDNodeWallet.fromPhrase(
-        process.env.UNSECURE_LOCAL_SEED!,
-        "",
-        "m"
+        process.env.UNSECURE_LOCAL_SEED!
       );
       const path = `44'/${this.signerSpec.coinType}'/0'/0/0`;
       const derived = masterNode.derivePath(path);

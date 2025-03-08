@@ -120,7 +120,7 @@ yarn start
 ### ⚠️ Local Mnemonic Signer
 
 ```env
-UNSECURE_LOCAL_SEED="A 12 OR 24 WORDS MNEMONIC PHRASE"
+UNSECURE_LOCAL_SEED="A 24 WORDS MNEMONIC PHRASE"
 ```
 
 **WARNING: The Local Mnemonic signer is for development and testing purposes only!**

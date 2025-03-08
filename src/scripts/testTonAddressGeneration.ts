@@ -56,7 +56,6 @@ async function testTonAddressGeneration() {
       // Log intermediate values to compare
       const seedPhrase = process.env.UNSECURE_LOCAL_SEED!;
       console.log("\nDerivation details:");
-      console.log("Seed phrase:", seedPhrase);
 
       // LocalSigner method
       const localSeed = ethers.sha256(Buffer.from(seedPhrase));
