@@ -9,17 +9,14 @@ import { LocalSigner } from "../signers/LocalSigner";
 import { errorTerminal, infoTerminal, italicInfoTerminal } from "../utils";
 import { encodePubKeyToAddress } from "../adamik/encodePubkeyToAddress";
 import { ethers } from "ethers";
-// Use require for TonWeb packages
 const TonWeb = require("tonweb");
 const tonMnemonic = require("tonweb-mnemonic");
 
-// Load environment variables
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 
 async function testTonAddressGeneration() {
   console.log("\n🔑 Starting TON Address Generation Test\n");
 
-  // First verify environment
   if (!process.env.UNSECURE_LOCAL_SEED) {
     errorTerminal("UNSECURE_LOCAL_SEED is not set in .env.local");
     return;
@@ -27,7 +24,7 @@ async function testTonAddressGeneration() {
 
   infoTerminal("✓ Environment loaded");
 
-  // Hardcode TON chain configuration
+  // TON chain configuration
   const tonConfig = {
     chainId: "ton",
     signerSpec: {
@@ -53,28 +50,20 @@ async function testTonAddressGeneration() {
     const words = process.env.UNSECURE_LOCAL_SEED!.split(" ");
 
     try {
-      // Log intermediate values to compare
       const seedPhrase = process.env.UNSECURE_LOCAL_SEED!;
       console.log("\nDerivation details:");
 
-      // LocalSigner method
       const localSeed = ethers.sha256(Buffer.from(seedPhrase));
       console.log("LocalSigner seed:", localSeed);
 
-      // TonWeb method - try their exact method
       console.log("\nDetailed TonWeb derivation:");
       const tonSeed = await tonMnemonic.mnemonicToSeed(words);
       console.log("TonWeb raw seed:", Buffer.from(tonSeed).toString("hex"));
 
-      // Show exactly how TonWeb creates the keypair
       const keyPair = TonWeb.utils.nacl.sign.keyPair.fromSeed(tonSeed);
       console.log(
         "TonWeb seed used for keypair:",
         Buffer.from(tonSeed).toString("hex")
-      );
-      console.log(
-        "TonWeb keypair generation method:",
-        "nacl.sign.keyPair.fromSeed(seed)"
       );
 
       const tonweb = new TonWeb();
@@ -128,7 +117,6 @@ async function testTonAddressGeneration() {
   }
 }
 
-// Run the test with explicit error handling
 infoTerminal("Starting TON address test...");
 testTonAddressGeneration()
   .then(() => {

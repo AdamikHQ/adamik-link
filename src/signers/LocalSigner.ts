@@ -50,12 +50,10 @@ export class LocalSigner implements BaseSigner {
 
   private async getSecp256k1Wallet(): Promise<HDNodeWallet> {
     if (!this.wallet) {
-      // Create master node from mnemonic
       const masterNode = ethers.HDNodeWallet.fromPhrase(
         process.env.UNSECURE_LOCAL_SEED!
       );
 
-      // Derive from master using coinType
       const derivationPath = `44'/${this.signerSpec.coinType}'/0'/0/0`;
       this.wallet = masterNode.derivePath(derivationPath);
     }
@@ -64,22 +62,17 @@ export class LocalSigner implements BaseSigner {
 
   private async getEd25519KeyPair(): Promise<nacl.SignKeyPair> {
     if (!this.ed25519KeyPair) {
-      // For TON, use TON-specific derivation
       if (this.signerSpec.coinType === "607") {
-        // Use tonweb-mnemonic for proper TON seed generation
         const tonMnemonic = require("tonweb-mnemonic");
         const words = process.env.UNSECURE_LOCAL_SEED!.split(" ");
 
-        // This follows the exact TON seed generation process
         const seed = await tonMnemonic.mnemonicToSeed(words);
         this.ed25519KeyPair = nacl.sign.keyPair.fromSeed(seed);
       } else {
-        // For other ED25519 chains, use standard BIP39/SLIP-0010
         const words = process.env.UNSECURE_LOCAL_SEED!.split(" ");
         const tonMnemonic = require("tonweb-mnemonic");
         const seed = await tonMnemonic.mnemonicToSeed(words);
 
-        // Use SLIP-0010 for standard ED25519 derivation
         const hdPath = stringToPath(
           `m/44'/${this.signerSpec.coinType}'/0'/0'/0'`
         );
@@ -102,9 +95,7 @@ export class LocalSigner implements BaseSigner {
       const path = `44'/${this.signerSpec.coinType}'/0'/0/0`;
       const derived = masterNode.derivePath(path);
 
-      // Hash the private key to ensure it's in the valid range for StarkNet
       const hashedKey = ethers.sha256(derived.privateKey);
-      // Ensure the key is in the valid range by taking modulo of the curve order
       const keyBigInt = BigInt(hashedKey);
       const starkCurveOrder = BigInt(
         "3618502788666131213697322783095070105526743751716087489154079457884512865583"
