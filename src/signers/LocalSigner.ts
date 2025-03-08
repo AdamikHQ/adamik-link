@@ -66,18 +66,24 @@ export class LocalSigner implements BaseSigner {
 
   private async getEd25519KeyPair(): Promise<nacl.SignKeyPair> {
     if (!this.ed25519KeyPair) {
-      // Get the mnemonic words
-      const words = process.env.UNSECURE_LOCAL_SEED!.split(" ");
+      // For TON, use TON-specific derivation
+      if (this.signerSpec.coinType === "607") {
+        // Use tonweb-mnemonic for proper TON seed generation
+        const tonMnemonic = require("tonweb-mnemonic");
+        const words = process.env.UNSECURE_LOCAL_SEED!.split(" ");
 
-      // Use tonweb-mnemonic for proper BIP39 seed generation
-      const tonMnemonic = require("tonweb-mnemonic");
-      const seed = await tonMnemonic.mnemonicToSeed(words);
+        // Use password if provided in environment
+        const password = process.env.TON_SEED_PASSWORD || "";
 
-      // Check if this chain uses direct seed
-      if (DIRECT_SEED_CHAINS.includes(this.signerSpec.coinType)) {
-        // Use seed directly (like TON does)
+        // This follows the exact TON seed generation process
+        const seed = await tonMnemonic.mnemonicToSeed(words, password);
         this.ed25519KeyPair = nacl.sign.keyPair.fromSeed(seed);
       } else {
+        // For other ED25519 chains, use standard BIP39/SLIP-0010
+        const words = process.env.UNSECURE_LOCAL_SEED!.split(" ");
+        const tonMnemonic = require("tonweb-mnemonic");
+        const seed = await tonMnemonic.mnemonicToSeed(words);
+
         // Use SLIP-0010 for standard ED25519 derivation
         const hdPath = stringToPath(
           `m/44'/${this.signerSpec.coinType}'/0'/0'/0'`
