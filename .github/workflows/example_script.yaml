@@ -29,8 +29,28 @@ jobs:
           STARKNET_PRIVATE_KEY: ${{ secrets.STARKNET_PRIVATE_KEY }}
           UNSECURE_LOCAL_SEED: ${{ secrets.UNSECURE_LOCAL_SEED }}
         run: |
-          pnpm run test
-        continue-on-error: true # Continue to next step even if tests fail
+          # Capture the output and store it in a file
+          npm run test 2>&1 | tee test-output.log
+
+      - name: Extract balances
+        run: |
+          # Extract all balance lines and format them
+          BALANCES=$(grep -o '\[BALANCE\].*' test-output.log | sort -u)
+          echo "BALANCE_INFO<<EOF" >> $GITHUB_ENV
+          if [ -n "$BALANCES" ]; then
+            echo "$BALANCES" >> $GITHUB_ENV
+            # Write to GitHub Actions summary
+            echo "### 💰 Balance Information" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "$BALANCES" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No balance information found" >> $GITHUB_ENV
+            # Write to GitHub Actions summary
+            echo "### 💰 Balance Information" >> $GITHUB_STEP_SUMMARY
+            echo "No balance information found" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "EOF" >> $GITHUB_ENV
 
       - name: Check test results
         run: |
@@ -52,6 +72,12 @@ jobs:
             :github: *Repository:* ${{ github.repository }}
             :bust_in_silhouette: *Triggered by:* ${{ github.actor }}
             :github: *Branch:* ${{ github.ref_name }}
+
+            :moneybag: *Balance Information:*
+            ```
+            ${{ env.BALANCE_INFO }}
+            ```
+
             :link: *View Run:* https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
             ${{ env.TESTS_FAILED == 'true' && ':warning: Check the workflow logs for more details :mag_right:' || ':sparkles: All tests passed successfully! :rocket:' }}

@@ -17,8 +17,48 @@ describe("Ethereum with Adamik", () => {
     console.log("Creating wallet...");
     const wallet = Wallet.fromPhrase(walletPhrase);
 
-    console.log("Wallet created");
-    console.log({ senderAddress: wallet.address });
+    const senderAddress = wallet.address;
+
+    const chainInfo = await fetch(
+      `${ADAMIK_API_BASE_URL}/api/chains/${chainId}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: ADAMIK_API_KEY,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const chainInfoData = await chainInfo.json();
+
+    const decimals = chainInfoData.chain.decimals;
+    const ticker = chainInfoData.chain.ticker;
+    console.log("Decimals:", decimals);
+
+    const balanceRequest = await fetch(
+      `${ADAMIK_API_BASE_URL}/api/${chainId}/account/${senderAddress}/state`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: ADAMIK_API_KEY,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const balanceData = await balanceRequest.json();
+
+    const balance = balanceData.balances.native.available;
+
+    console.log("Balance:", balance);
+    console.log(
+      `[BALANCE] [${chainId}] ${senderAddress} : ${(
+        Number(balance) / Math.pow(10, decimals)
+      ).toString()} ${ticker}`
+    );
+
+    const amount = (BigInt(balance) / 1000n).toString() || "10000";
 
     const requestBody = {
       transaction: {
@@ -27,7 +67,7 @@ describe("Ethereum with Adamik", () => {
           mode: "transfer",
           sender: wallet.address,
           recipient: recipientAddress || wallet.address, // Self-send if no recipient
-          amount: "10000", // Transaction amount
+          amount: amount, // Transaction amount
           useMaxAmount: false,
           memo: "",
           format: "hex",
@@ -54,14 +94,14 @@ describe("Ethereum with Adamik", () => {
     );
 
     const encodedData = await responseEncode.json();
-    console.log(JSON.stringify(encodedData, null, 2));
+    console.log("\x1b[32m" + JSON.stringify(encodedData, null, 2) + "\x1b[0m");
 
     expect(encodedData.transaction.encoded).to.exist;
     expect(encodedData.transaction.data.sender).to.equal(wallet.address);
     expect(encodedData.transaction.data.recipient).to.equal(
       recipientAddress || wallet.address
     );
-    expect(encodedData.transaction.data.amount).to.equal("10000");
+    expect(encodedData.transaction.data.amount).to.equal(amount);
     expect(encodedData.chainId).to.equal(chainId);
 
     // Sign the encoded transaction
@@ -95,7 +135,10 @@ describe("Ethereum with Adamik", () => {
     );
 
     const responseData = await responseBroadcast.json();
-    console.log("Transaction Result:", JSON.stringify(responseData, null, 2));
+    console.log(
+      "Transaction Result:",
+      "\x1b[32m" + JSON.stringify(responseData, null, 2) + "\x1b[0m"
+    );
 
     expect(responseData.hash).to.exist;
   });

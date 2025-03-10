@@ -38,6 +38,46 @@ describe("Bitcoin with Adamik", () => {
 
     console.log("public address of sender:", address);
 
+    const chainInfo = await fetch(
+      `${ADAMIK_API_BASE_URL}/api/chains/${chainId}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: ADAMIK_API_KEY,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const chainInfoData = await chainInfo.json();
+
+    const decimals = chainInfoData.chain.decimals;
+    const ticker = chainInfoData.chain.ticker;
+    console.log("Decimals:", decimals);
+
+    const balanceRequest = await fetch(
+      `${ADAMIK_API_BASE_URL}/api/${chainId}/account/${address}/state`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: ADAMIK_API_KEY,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const balanceData = await balanceRequest.json();
+
+    const balance = balanceData.balances.native.available;
+
+    console.log("SenderAddress :", address);
+    console.log("Balance:", balance);
+    console.log(
+      `[BALANCE] [${chainId}] ${address} : ${(
+        Number(balance) / Math.pow(10, decimals)
+      ).toString()} ${ticker}`
+    );
+
     // Prepare the transaction request
     const requestBody = {
       transaction: {
@@ -65,7 +105,10 @@ describe("Bitcoin with Adamik", () => {
     );
 
     const encodedData = await responseEncode.json();
-    console.log("encodedData:", JSON.stringify(encodedData, null, 2));
+    console.log(
+      "encodedData:",
+      "\x1b[32m" + JSON.stringify(encodedData, null, 2) + "\x1b[0m"
+    );
     const rawtx = encodedData.transaction.encoded;
 
     // Create and sign the PSBT (Partially Signed Bitcoin Transaction)
@@ -106,7 +149,10 @@ describe("Bitcoin with Adamik", () => {
     );
 
     const responseData = await responseBroadcast.json();
-    console.log("Transaction Result:", JSON.stringify(responseData));
+    console.log(
+      "Transaction Result:",
+      "\x1b[32m" + JSON.stringify(responseData) + "\x1b[0m"
+    );
 
     expect(responseData.hash).to.exist;
   });

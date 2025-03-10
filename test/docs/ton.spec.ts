@@ -26,7 +26,44 @@ describe("TON with Adamik", () => {
     });
     const address = wallet.address.toString();
 
-    console.log("Wallet created : ", address);
+    const chainInfo = await fetch(
+      `${ADAMIK_API_BASE_URL}/api/chains/${chainId}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: ADAMIK_API_KEY,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const chainInfoData = await chainInfo.json();
+
+    const decimals = chainInfoData.chain.decimals;
+    const ticker = chainInfoData.chain.ticker;
+    console.log("Decimals:", decimals);
+
+    const balanceRequest = await fetch(
+      `${ADAMIK_API_BASE_URL}/api/${chainId}/account/${address}/state`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: ADAMIK_API_KEY,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const balanceData = await balanceRequest.json();
+
+    const balance = balanceData.balances.native.available;
+
+    console.log("Balance:", balance);
+    console.log(
+      `[BALANCE] [${chainId}] ${address} : ${(
+        Number(balance) / Math.pow(10, decimals)
+      ).toString()} ${ticker}`
+    );
 
     // Prepare the transaction request
     const requestBody = {
@@ -61,7 +98,7 @@ describe("TON with Adamik", () => {
     );
 
     const encodedData = await responseEncode.json();
-    console.log(JSON.stringify(encodedData, null, 2));
+    console.log("\x1b[32m" + JSON.stringify(encodedData, null, 2) + "\x1b[0m");
 
     expect(encodedData.transaction.encoded).to.exist;
     expect(encodedData.transaction.data.sender).to.equal(address);
@@ -105,7 +142,10 @@ describe("TON with Adamik", () => {
     );
 
     const responseData = await responseBroadcast.json();
-    console.log("Transaction Result:", JSON.stringify(responseData, null, 2));
+    console.log(
+      "Transaction Result:",
+      "\x1b[32m" + JSON.stringify(responseData, null, 2) + "\x1b[0m"
+    );
 
     expect(responseData.hash).to.exist;
   });
