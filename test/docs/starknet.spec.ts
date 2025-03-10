@@ -7,6 +7,9 @@ dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 
 const walletPrivateKey = process.env.STARKNET_PRIVATE_KEY || "";
 const ADAMIK_API_KEY = process.env.ADAMIK_API_KEY || "your-adamik-api-key"; // get it from https://dashboard.adamik.io
+const ADAMIK_API_BASE_URL =
+  process.env.ADAMIK_API_BASE_URL || "https://api-staging.adamik.io";
+const chainId = "starknet";
 
 describe("Starknet with Adamik", () => {
   it("should encode a transaction and broadcast it", async () => {
@@ -20,7 +23,7 @@ describe("Starknet with Adamik", () => {
 
     // Fetch the wallet address from Adamik API
     const responseAddressEncode = await fetch(
-      "https://api-staging.adamik.io/api/starknet/address/encode",
+      `${ADAMIK_API_BASE_URL}/api/${chainId}/address/encode`,
       {
         method: "POST",
         headers: {
@@ -51,7 +54,7 @@ describe("Starknet with Adamik", () => {
       },
     };
     const response = await fetch(
-      "https://api-staging.adamik.io/api/starknet/transaction/encode",
+      `${ADAMIK_API_BASE_URL}/api/${chainId}/transaction/encode`,
       {
         method: "POST",
         headers: {
@@ -84,7 +87,7 @@ describe("Starknet with Adamik", () => {
         };
 
         const responseDeploy = await fetch(
-          "https://api-staging.adamik.io/api/starknet/transaction/encode",
+          `${ADAMIK_API_BASE_URL}/api/${chainId}/transaction/encode`,
           {
             method: "POST",
             headers: {

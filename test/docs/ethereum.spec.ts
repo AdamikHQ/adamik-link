@@ -58,7 +58,9 @@ describe("Ethereum with Adamik", () => {
 
     expect(encodedData.transaction.encoded).to.exist;
     expect(encodedData.transaction.data.sender).to.equal(wallet.address);
-    expect(encodedData.transaction.data.recipient).to.equal(recipientAddress);
+    expect(encodedData.transaction.data.recipient).to.equal(
+      recipientAddress || wallet.address
+    );
     expect(encodedData.transaction.data.amount).to.equal("10000");
     expect(encodedData.chainId).to.equal(chainId);
 

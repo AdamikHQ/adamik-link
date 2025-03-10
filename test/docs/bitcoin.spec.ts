@@ -21,6 +21,9 @@ const mnemonic = process.env.UNSECURE_LOCAL_SEED || "";
 const derivationPath = `m/86'/0'/0'/0/0`;
 const recipientAddress = ""; // recipient of your choice, sender if none
 const ADAMIK_API_KEY = process.env.ADAMIK_API_KEY || ""; // Adamik API key
+const ADAMIK_API_BASE_URL =
+  process.env.ADAMIK_API_BASE_URL || "https://api.adamik.io";
+const chainId = "bitcoin";
 
 describe("Bitcoin with Adamik", () => {
   it.skip("should encode a transaction and broadcast it", async () => {
@@ -50,7 +53,7 @@ describe("Bitcoin with Adamik", () => {
 
     // Encode the transaction with Adamik API
     const responseEncode = await fetch(
-      "https://api.adamik.io/api/bitcoin/transaction/encode",
+      `${ADAMIK_API_BASE_URL}/api/${chainId}/transaction/encode`,
       {
         method: "POST",
         headers: {
@@ -91,7 +94,7 @@ describe("Bitcoin with Adamik", () => {
 
     // Broadcast the transaction using Adamik API
     const responseBroadcast = await fetch(
-      "https://api.adamik.io/api/bitcoin/transaction/broadcast",
+      `${ADAMIK_API_BASE_URL}/api/${chainId}/transaction/broadcast`,
       {
         method: "POST",
         headers: {

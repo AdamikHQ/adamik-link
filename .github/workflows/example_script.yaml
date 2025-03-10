@@ -42,20 +42,19 @@ jobs:
             echo "TESTS_FAILED=false" >> $GITHUB_ENV
           fi
 
-      - name: Send Slack notification on failure
-        if: env.TESTS_FAILED == 'true'
+      - name: Send Slack notification
         uses: 8398a7/action-slack@v3
         with:
-          status: failure
+          status: ${{ env.TESTS_FAILED == 'true' && 'failure' || 'success' }}
           fields: repo,message,commit,author,action,eventName,ref,workflow,job,took
           text: |
-            :rotating_light: *TEST RUNNER WORKFLOW FAILED!* :rotating_light:
+            ${{ env.TESTS_FAILED == 'true' && ':rotating_light: *TEST RUNNER WORKFLOW FAILED!* :rotating_light:' || ':white_check_mark: *TEST RUNNER WORKFLOW SUCCEEDED!* :tada:' }}
             :github: *Repository:* ${{ github.repository }}
             :bust_in_silhouette: *Triggered by:* ${{ github.actor }}
             :github: *Branch:* ${{ github.ref_name }}
             :link: *View Run:* https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-            :warning: Check the workflow logs for more details :mag_right:
+            ${{ env.TESTS_FAILED == 'true' && ':warning: Check the workflow logs for more details :mag_right:' || ':sparkles: All tests passed successfully! :rocket:' }}
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 

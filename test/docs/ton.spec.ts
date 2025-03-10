@@ -9,6 +9,9 @@ dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 const walletPhrase = process.env.UNSECURE_LOCAL_SEED || "";
 const ADAMIK_API_KEY = process.env.ADAMIK_API_KEY || "your-adamik-api-key"; // get it from https://dashboard.adamik.io
 const recipientAddress = "";
+const ADAMIK_API_BASE_URL =
+  process.env.ADAMIK_API_BASE_URL || "https://api.adamik.io";
+const chainId = "ton";
 
 describe("TON with Adamik", () => {
   it("should encode a transaction and broadcast it", async () => {
@@ -29,16 +32,12 @@ describe("TON with Adamik", () => {
     const requestBody = {
       transaction: {
         data: {
-          chainId: "ton", // TON blockchain
+          chainId: chainId, // TON blockchain
           mode: "transfer",
           sender: address,
           recipient: recipientAddress || address,
           amount: "10000",
           useMaxAmount: false,
-          fees: "0", // Set fees to 0 for now
-          gas: "0", // Gas is not required on TON
-          memo: "", // Optionally, add a memo
-          format: "hex",
           validatorAddress: "",
           params: {
             pubKey: keyPair.publicKey.toString("hex"),
@@ -50,7 +49,7 @@ describe("TON with Adamik", () => {
     console.log("Encoding transaction...");
     // Encode the transaction with Adamik API
     const responseEncode = await fetch(
-      "https://api.adamik.io/api/ton/transaction/encode",
+      `${ADAMIK_API_BASE_URL}/api/${chainId}/transaction/encode`,
       {
         method: "POST",
         headers: {
@@ -94,7 +93,7 @@ describe("TON with Adamik", () => {
 
     // Broadcast the transaction using Adamik API
     const responseBroadcast = await fetch(
-      "https://api.adamik.io/api/ton/transaction/broadcast",
+      `${ADAMIK_API_BASE_URL}/api/${chainId}/transaction/broadcast`,
       {
         method: "POST",
         headers: {
