@@ -42,16 +42,6 @@ jobs:
             echo "TESTS_FAILED=false" >> $GITHUB_ENV
           fi
 
-      - name: Check test results
-        run: |
-          if [ "${{ steps.run-tests.outcome }}" == "failure" ]; then
-            echo "Tests have failed"
-            echo "TESTS_FAILED=true" >> $GITHUB_ENV
-          else
-            echo "All tests passed"
-            echo "TESTS_FAILED=false" >> $GITHUB_ENV
-          fi
-
       - name: Send Slack notification on failure
         if: env.TESTS_FAILED == 'true'
         uses: 8398a7/action-slack@v3
@@ -61,9 +51,8 @@ jobs:
           text: |
             :rotating_light: *TEST RUNNER WORKFLOW FAILED!* :rotating_light:
             :github: *Repository:* ${{ github.repository }}
-            :timer_clock: *Workflow Duration:* ${{ job.status }}
             :bust_in_silhouette: *Triggered by:* ${{ github.actor }}
-            :git: *Branch:* ${{ github.ref_name }}
+            :github: *Branch:* ${{ github.ref_name }}
             :link: *View Run:* https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
             :warning: Check the workflow logs for more details :mag_right:
