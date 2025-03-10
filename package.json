@@ -9,6 +9,7 @@
     "test": "mocha --timeout 10000 -r tsx test/**/*.spec.ts"
   },
   "dependencies": {
+    "@cosmjs/crypto": "^0.33.0",
     "@dfns/sdk": "^0.6.3",
     "@dfns/sdk-keysigner": "^0.6.3",
     "@noble/curves": "^1.8.1",

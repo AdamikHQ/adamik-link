@@ -1,5 +1,4 @@
 import { HDNodeWallet, ethers } from "ethers";
-import { derivePath } from "ed25519-hd-key";
 import {
   AdamikCurve,
   AdamikHashFunction,
@@ -9,6 +8,27 @@ import { extractSignature, infoTerminal } from "../utils";
 import { BaseSigner } from "./types";
 import * as nacl from "tweetnacl";
 import { ec } from "starknet";
+import { Bip39, Slip10, Slip10Curve, stringToPath } from "@cosmjs/crypto";
+
+/**
+ * LocalSigner implements key derivation and signing for multiple curves:
+ *
+ * SECP256K1: Using ethers.js HD wallet (BIP32/BIP39/BIP44)
+ *   - Industry standard implementation
+ *   - Well tested with Ethereum and Bitcoin
+ *
+ * ED25519: Using chain-specific derivation
+ *   - Direct seed for TON and similar chains
+ *   - SLIP-0010 for chains that follow BIP32-ED25519
+ *   - Compatible with hardware wallets
+ *
+ * STARK: Using starknet.js
+ *   - Official StarkNet implementation
+ *   - Handles curve-specific requirements
+ */
+
+// Define chains that use direct seed instead of SLIP-0010
+const DIRECT_SEED_CHAINS = ["607"]; // TON
 
 export class LocalSigner implements BaseSigner {
   private wallet: HDNodeWallet | null = null;
@@ -30,14 +50,10 @@ export class LocalSigner implements BaseSigner {
 
   private async getSecp256k1Wallet(): Promise<HDNodeWallet> {
     if (!this.wallet) {
-      // Create master node from mnemonic
       const masterNode = ethers.HDNodeWallet.fromPhrase(
-        process.env.UNSECURE_LOCAL_SEED!,
-        "", // Empty password
-        "m" // Start from master path
+        process.env.UNSECURE_LOCAL_SEED!
       );
 
-      // Derive from master using coinType
       const derivationPath = `44'/${this.signerSpec.coinType}'/0'/0/0`;
       this.wallet = masterNode.derivePath(derivationPath);
     }
@@ -46,27 +62,26 @@ export class LocalSigner implements BaseSigner {
 
   private async getEd25519KeyPair(): Promise<nacl.SignKeyPair> {
     if (!this.ed25519KeyPair) {
-      // Convert mnemonic to seed using BIP39
-      const seed = ethers.HDNodeWallet.fromPhrase(
-        process.env.UNSECURE_LOCAL_SEED!
-      ).privateKey.slice(2); // Remove '0x'
+      if (this.signerSpec.coinType === "607") {
+        const tonMnemonic = require("tonweb-mnemonic");
+        const words = process.env.UNSECURE_LOCAL_SEED!.split(" ");
 
-      // Use proper BIP32-ED25519 derivation
-      // Note: ed25519-hd-key uses m/purpose'/coin_type'/account'/change/address_index format
-      const derivationPath = `m/44'/${this.signerSpec.coinType}'/0'/0/0`;
+        const seed = await tonMnemonic.mnemonicToSeed(words);
+        this.ed25519KeyPair = nacl.sign.keyPair.fromSeed(seed);
+      } else {
+        const words = process.env.UNSECURE_LOCAL_SEED!.split(" ");
+        const tonMnemonic = require("tonweb-mnemonic");
+        const seed = await tonMnemonic.mnemonicToSeed(words);
 
-      try {
-        const { key } = derivePath(derivationPath, seed);
-        this.ed25519KeyPair = nacl.sign.keyPair.fromSeed(
-          Buffer.from(key).slice(0, 32)
+        const hdPath = stringToPath(
+          `m/44'/${this.signerSpec.coinType}'/0'/0'/0'`
         );
-      } catch (error) {
-        // If the first attempt fails, try without the last two segments
-        const fallbackPath = `m/44'/${this.signerSpec.coinType}'/0'`;
-        const { key } = derivePath(fallbackPath, seed);
-        this.ed25519KeyPair = nacl.sign.keyPair.fromSeed(
-          Buffer.from(key).slice(0, 32)
+        const { privkey } = Slip10.derivePath(
+          Slip10Curve.Ed25519,
+          seed,
+          hdPath
         );
+        this.ed25519KeyPair = nacl.sign.keyPair.fromSeed(Buffer.from(privkey));
       }
     }
     return this.ed25519KeyPair;
@@ -75,16 +90,12 @@ export class LocalSigner implements BaseSigner {
   private async getStarkPrivateKey(): Promise<string> {
     if (!this.starkPrivateKey) {
       const masterNode = ethers.HDNodeWallet.fromPhrase(
-        process.env.UNSECURE_LOCAL_SEED!,
-        "",
-        "m"
+        process.env.UNSECURE_LOCAL_SEED!
       );
       const path = `44'/${this.signerSpec.coinType}'/0'/0/0`;
       const derived = masterNode.derivePath(path);
 
-      // Hash the private key to ensure it's in the valid range for StarkNet
       const hashedKey = ethers.sha256(derived.privateKey);
-      // Ensure the key is in the valid range by taking modulo of the curve order
       const keyBigInt = BigInt(hashedKey);
       const starkCurveOrder = BigInt(
         "3618502788666131213697322783095070105526743751716087489154079457884512865583"
