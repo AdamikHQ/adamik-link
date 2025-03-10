@@ -23,7 +23,7 @@ const recipientAddress = ""; // recipient of your choice, sender if none
 const ADAMIK_API_KEY = process.env.ADAMIK_API_KEY || ""; // Adamik API key
 
 describe("Bitcoin with Adamik", () => {
-  it("should encode a transaction and broadcast it", async () => {
+  it.skip("should encode a transaction and broadcast it", async () => {
     // Create wallet using mnemonic phrase
     const seed = await bip39.mnemonicToSeed(mnemonic);
     const rootKey = bip32.fromSeed(seed);

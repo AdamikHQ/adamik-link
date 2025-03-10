@@ -1,13 +1,16 @@
 import { expect } from "chai";
 import * as dotenv from "dotenv";
-import { Wallet } from "ethers";
+import { ethers, Wallet } from "ethers";
 import path from "path";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 
 const walletPhrase = process.env.UNSECURE_LOCAL_SEED || "";
+const ADAMIK_API_BASE_URL =
+  process.env.ADAMIK_API_BASE_URL || "https://api.adamik.io";
 const ADAMIK_API_KEY = process.env.ADAMIK_API_KEY || "your-adamik-api-key"; // get it from https://dashboard.adamik.io
-const recipientAddress = "0xeD35957be660cf9A2C768fDB52eC4D9D19eEB80F";
+const recipientAddress = "";
+const chainId = "sepolia";
 
 describe("Ethereum with Adamik", () => {
   it("should encode a transaction and broadcast it", async () => {
@@ -20,16 +23,14 @@ describe("Ethereum with Adamik", () => {
     const requestBody = {
       transaction: {
         data: {
-          chainId: "sepolia", // Target Ethereum testnet chain
+          chainId: chainId, // Target Ethereum testnet chain
           mode: "transfer",
           sender: wallet.address,
           recipient: recipientAddress || wallet.address, // Self-send if no recipient
           amount: "10000", // Transaction amount
           useMaxAmount: false,
-          fees: "0",
-          gas: "0",
           memo: "",
-          format: "json",
+          format: "hex",
           validatorAddress: "",
           params: {
             pubKey: wallet.publicKey, // Public key of the wallet
@@ -41,7 +42,7 @@ describe("Ethereum with Adamik", () => {
     console.log("Encoding transaction...");
     // Encode the transaction with Adamik API
     const responseEncode = await fetch(
-      "https://api.adamik.io/api/sepolia/transaction/encode",
+      `${ADAMIK_API_BASE_URL}/api/${chainId}/transaction/encode`,
       {
         method: "POST",
         headers: {
@@ -59,10 +60,11 @@ describe("Ethereum with Adamik", () => {
     expect(encodedData.transaction.data.sender).to.equal(wallet.address);
     expect(encodedData.transaction.data.recipient).to.equal(recipientAddress);
     expect(encodedData.transaction.data.amount).to.equal("10000");
-    expect(encodedData.chainId).to.equal("sepolia");
+    expect(encodedData.chainId).to.equal(chainId);
 
     // Sign the encoded transaction
-    const tx = encodedData.transaction.encoded;
+    const tx = ethers.Transaction.from(encodedData.transaction.encoded);
+    console.log(tx.toJSON());
     console.log("Signing transaction...");
     const signature = await wallet.signTransaction(tx);
     console.log("Transaction signed : ", signature);
@@ -70,8 +72,7 @@ describe("Ethereum with Adamik", () => {
     // Prepare to broadcast the signed transaction
     const sendTransactionBody = {
       transaction: {
-        data: encodedData.transaction.data,
-        encoded: tx,
+        ...encodedData.transaction,
         signature: signature,
       },
     };
@@ -80,7 +81,7 @@ describe("Ethereum with Adamik", () => {
 
     // Broadcast the transaction using Adamik API
     const responseBroadcast = await fetch(
-      "https://api.adamik.io/api/sepolia/transaction/broadcast",
+      `${ADAMIK_API_BASE_URL}/api/${chainId}/transaction/broadcast`,
       {
         method: "POST",
         headers: {
