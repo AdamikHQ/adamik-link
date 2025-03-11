@@ -30,7 +30,7 @@ jobs:
           UNSECURE_LOCAL_SEED: ${{ secrets.UNSECURE_LOCAL_SEED }}
         run: |
           # Capture the output and store it in a file
-          npm run test 2>&1 | tee test-output.log
+          pnpm run test 2>&1 | tee test-output.log
 
       - name: Extract balances
         run: |
