@@ -29,8 +29,9 @@ jobs:
           STARKNET_PRIVATE_KEY: ${{ secrets.STARKNET_PRIVATE_KEY }}
           UNSECURE_LOCAL_SEED: ${{ secrets.UNSECURE_LOCAL_SEED }}
         run: |
-          # Capture the output and store it in a file
+          # Run tests and capture output while preserving exit code
           pnpm run test 2>&1 | tee test-output.log
+          exit ${PIPESTATUS[0]}  # Use the exit code from pnpm run test, not tee
 
       - name: Extract balances
         run: |
@@ -63,12 +64,13 @@ jobs:
           fi
 
       - name: Send Slack notification
+        if: env.TESTS_FAILED == 'true' # Only run this step if tests failed
         uses: 8398a7/action-slack@v3
         with:
-          status: ${{ env.TESTS_FAILED == 'true' && 'failure' || 'success' }}
+          status: "failure" # Always failure since we only notify on failures
           fields: repo,message,commit,author,action,eventName,ref,workflow,job,took
           text: |
-            ${{ env.TESTS_FAILED == 'true' && ':rotating_light: *TEST RUNNER WORKFLOW FAILED!* :rotating_light:' || ':white_check_mark: *TEST RUNNER WORKFLOW SUCCEEDED!* :tada:' }}
+            :rotating_light: *TEST RUNNER WORKFLOW FAILED!* :rotating_light:
             :github: *Repository:* ${{ github.repository }}
             :bust_in_silhouette: *Triggered by:* ${{ github.actor }}
             :github: *Branch:* ${{ github.ref_name }}
@@ -80,7 +82,7 @@ jobs:
 
             :link: *View Run:* https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-            ${{ env.TESTS_FAILED == 'true' && ':warning: Check the workflow logs for more details :mag_right:' || ':sparkles: All tests passed successfully! :rocket:' }}
+            :warning: Check the workflow logs for more details :mag_right:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
