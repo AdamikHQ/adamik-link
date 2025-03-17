@@ -64,8 +64,8 @@ const transactionBroadcast = async () => {
       data: {
         chainId: chainId, // Target Ethereum testnet chain
         mode: "transfer",
-        sender: wallet.address,
-        recipient: recipientAddress || wallet.address, // Self-send if no recipient
+        senderAddress: wallet.address,
+        recipientAddress: recipientAddress || wallet.address, // Self-send if no recipient
         amount: amount, // Transaction amount
         useMaxAmount: false,
         memo: "",

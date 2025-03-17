@@ -70,8 +70,8 @@ const transactionBroadcast = async () => {
       data: {
         chainId: chainId, // TON blockchain
         mode: "transfer",
-        sender: address,
-        recipient: recipientAddress || address,
+        senderAddress: address,
+        recipientAddress: recipientAddress || address,
         amount: "10000",
         useMaxAmount: false,
         validatorAddress: "",

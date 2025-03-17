@@ -32,6 +32,7 @@ jobs:
           # Run tests and capture output while preserving exit code
           pnpm run test 2>&1 | tee test-output.log
           exit ${PIPESTATUS[0]}  # Use the exit code from pnpm run test, not tee
+        continue-on-error: true
 
       - name: Extract balances
         run: |

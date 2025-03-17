@@ -83,8 +83,8 @@ const transactionBroadcast = async () => {
       data: {
         chainId: "bitcoin", // Target Bitcoin
         mode: "transfer", // Simple tx
-        sender: address,
-        recipient: recipientAddress || address,
+        senderAddress: address,
+        recipientAddress: recipientAddress || address,
         amount: "10", // Transaction amount in satoshis
       },
     },

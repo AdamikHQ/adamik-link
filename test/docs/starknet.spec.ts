@@ -8,7 +8,7 @@ dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 const walletPrivateKey = process.env.STARKNET_PRIVATE_KEY || "";
 const ADAMIK_API_KEY = process.env.ADAMIK_API_KEY || "your-adamik-api-key"; // get it from https://dashboard.adamik.io
 const ADAMIK_API_BASE_URL =
-  process.env.ADAMIK_API_BASE_URL || "https://api-staging.adamik.io";
+  process.env.ADAMIK_API_BASE_URL || "https://api.adamik.io";
 const chainId = "starknet";
 
 const transactionBroadcast = async () => {
@@ -165,7 +165,7 @@ const transactionBroadcast = async () => {
 
   // Broadcast the signed transaction
   const broadcastResponse = await fetch(
-    "https://api-staging.adamik.io/api/starknet/transaction/broadcast",
+    `${ADAMIK_API_BASE_URL}/api/${chainId}/transaction/broadcast`,
     {
       method: "POST",
       headers: {
