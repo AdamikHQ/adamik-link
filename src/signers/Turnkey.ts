@@ -72,6 +72,9 @@ export class TurnkeySigner implements BaseSigner {
       .apiClient()
       .getWalletAccounts({
         walletId: process.env.TURNKEY_WALLET_ID!,
+        paginationOptions: {
+          limit: "100",
+        },
       });
 
     const accountCompressed = accounts.find(
