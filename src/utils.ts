@@ -1,6 +1,6 @@
 import picocolors from "picocolors";
 import { AdamikSignatureFormat } from "./adamik/types";
-import { Signer } from "./signers";
+import { SignerType } from "./signers/types";
 
 /**
  * Converts an amount from the main unit to the smallest unit
@@ -83,7 +83,7 @@ export const getCoinTypeFromDerivationPath = (
   return coinType;
 };
 
-const CONSOLE_SOURCE = ["Adamik", ...Object.values(Signer)];
+const CONSOLE_SOURCE = ["Adamik", ...Object.values(SignerType)];
 
 export const infoTerminal = (message: string, source?: string) => {
   if (source === "Adamik") {

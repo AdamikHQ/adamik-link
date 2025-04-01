@@ -20,8 +20,8 @@ async function main() {
     picocolors.cyan(`
     █████╗ ██████╗  █████╗ ███╗   ███╗██╗██╗  ██╗      ██╗     ██╗███╗   ██╗██╗  ██╗
    ██╔══██╗██╔══██╗██╔══██╗████╗ ████║██║██║ ██╔╝      ██║     ██║████╗  ██║██║ ██╔╝
-   ███████║██║  ██║███████║██╔████╔██║██║█████╔╝       ██║     ██║██╔██╗ ██║█████╔╝ 
-   ██╔══██║██║  ██║██╔══██║██║╚██╔╝██║██║██╔═██╗       ██║     ██║██║╚██╗██║██╔═██╗ 
+   ███████║██║  ██║███████║██╔████╔██║██║█████╔╝       ██║     ██║██╔██╗ ██║█████╔╝
+   ██╔══██║██║  ██║██╔══██║██║╚██╔╝██║██║██╔═██╗       ██║     ██║██║╚██╗██║██╔═██╗
    ██║  ██║██████╔╝██║  ██║██║ ╚═╝ ██║██║██║  ██╗      ███████╗██║██║ ╚████║██║  ██╗
    ╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝  ╚═╝      ╚══════╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝
 
@@ -60,9 +60,12 @@ async function main() {
         continue;
       }
 
+      infoTerminal(`- Signer spec:\n`, "Adamik");
+      await italicInfoTerminal(JSON.stringify(signerSpec, null, 2), 200);
+
       infoTerminal("\n========================================");
 
-      const signer = await signerSelector(chainId, signerSpec);
+      const signer = await signerSelector(chains[chainId], signerSpec);
 
       infoTerminal("========================================");
 
@@ -79,7 +82,7 @@ async function main() {
       infoTerminal("========================================");
 
       infoTerminal(`Encoding pubkey to address ...`, "Adamik");
-      const address = await encodePubKeyToAddress(pubkey, chainId);
+      const address = await encodePubKeyToAddress(pubkey, chainId, signer);
       infoTerminal(`Address:`, "Adamik");
       await italicInfoTerminal(address);
 
@@ -136,6 +139,7 @@ async function main() {
       await italicInfoTerminal(
         JSON.stringify(transactionEncodeResponse.transaction.data, null, 2)
       );
+
       infoTerminal(`- Message to sign :`, "Adamik");
       await italicInfoTerminal(transactionEncodeResponse.transaction.encoded);
 
@@ -217,6 +221,7 @@ async function main() {
         infoTerminal("Exiting script. Goodbye!");
         process.exit(0);
       }
+      //*/
     } catch (error) {
       if (typeof error === "string") {
         errorTerminal(error);

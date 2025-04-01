@@ -1,7 +1,13 @@
 import prompts from "prompts";
-import { AdamikChain } from "./types";
+import { AdamikChain, AdamikSignerSpec } from "./types";
 
-export const adamikGetChains = async () => {
+interface AdamikGetChainsResponse {
+  chains: Record<string, AdamikChain>;
+  chainId: string;
+  signerSpec: AdamikSignerSpec;
+}
+
+export const adamikGetChains = async (): Promise<AdamikGetChainsResponse> => {
   const fetchAllChains = await fetch(
     `${process.env.ADAMIK_API_BASE_URL}/api/chains`,
     {

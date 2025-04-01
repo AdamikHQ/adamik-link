@@ -24,6 +24,7 @@ export type AdamikSignerSpec = {
 };
 
 export type AdamikChain = {
+  id: string;
   name: string;
   family: string;
   ticker: string;
