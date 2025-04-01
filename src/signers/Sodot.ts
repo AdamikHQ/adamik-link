@@ -1,4 +1,5 @@
 import {
+  AdamikChain,
   AdamikCurve,
   AdamikHashFunction,
   AdamikSignerSpec,
@@ -9,8 +10,7 @@ import {
   infoTerminal,
   italicInfoTerminal,
 } from "../utils";
-import { Signer } from "./index";
-import { BaseSigner } from "./types";
+import { SignerType, BaseSigner } from "./types";
 
 type SodotSignatureResponse =
   | {
@@ -22,9 +22,9 @@ type SodotSignatureResponse =
   | { signature: string };
 
 export class SodotSigner implements BaseSigner {
-  public chainId: string;
+  public chain: AdamikChain;
   public signerSpec: AdamikSignerSpec;
-  public signerName = Signer.SODOT;
+  public signerName = SignerType.SODOT;
 
   // TODO: Make this configurable and extendable
   private SODOT_VERTICES = [
@@ -46,8 +46,8 @@ export class SodotSigner implements BaseSigner {
 
   private keyIds: string[] = [];
 
-  constructor(chainId: string, signerSpec: AdamikSignerSpec) {
-    this.chainId = chainId;
+  constructor(chain: AdamikChain, signerSpec: AdamikSignerSpec) {
+    this.chain = chain;
     this.signerSpec = signerSpec;
 
     switch (signerSpec.curve) {
