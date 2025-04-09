@@ -83,6 +83,12 @@ export class DfnsSigner implements BaseSigner {
     return wallet;
   }
 
+  private async starknetPubkeyFormatting(bytes: string) {
+    const hex = bytes.substring(2);
+    const stripped = hex.replace(/^0+/gm, ""); // strip leading 0s
+    return `0x${stripped}`;
+  }
+
   private async listWallets() {
     const wallets = await this.dfnsApi.wallets.listWallets();
     return wallets;
@@ -106,6 +112,12 @@ export class DfnsSigner implements BaseSigner {
 
       this.walletId = existingWallet.id;
 
+      if (this.signerSpec.curve === AdamikCurve.STARK) {
+        return this.starknetPubkeyFormatting(
+          existingWallet.signingKey.publicKey
+        );
+      }
+
       return existingWallet.signingKey.publicKey;
     }
 
@@ -116,6 +128,10 @@ export class DfnsSigner implements BaseSigner {
     infoTerminal(`New wallet created`);
 
     this.walletId = wallet.id;
+
+    if (this.signerSpec.curve === AdamikCurve.STARK) {
+      return this.starknetPubkeyFormatting(wallet.signingKey.publicKey);
+    }
 
     return wallet.signingKey.publicKey;
   }
