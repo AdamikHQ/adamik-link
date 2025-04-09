@@ -10,7 +10,6 @@ import { AsymmetricKeySigner } from "@dfns/sdk-keysigner";
 import { ethers, sha256 } from "ethers";
 import { extractSignature, infoTerminal, italicInfoTerminal } from "../utils";
 import { BaseSigner } from "./types";
-import { ec } from "starknet";
 
 export class DfnsSigner implements BaseSigner {
   private dfnsApi: DfnsApiClient;
