@@ -136,7 +136,7 @@ export class DfnsSigner implements BaseSigner {
     return wallet.signingKey.publicKey;
   }
 
-  private async signHash(hash: string) {
+  private async signDFNSHash(hash: string) {
     const formattedHash = hash.startsWith("0x") ? hash : "0x" + hash;
 
     await italicInfoTerminal(JSON.stringify(formattedHash, null, 2));
@@ -229,18 +229,23 @@ export class DfnsSigner implements BaseSigner {
     }
   }
 
-  async signTransaction(encodedMessage: string): Promise<string> {
+  async signTransaction(
+    encodedMessage: string,
+    byPassHashFunction = false
+  ): Promise<string> {
     try {
-      const toSign = await this.hashTransactionPayload(
-        this.signerSpec.hashFunction,
-        this.signerSpec.curve,
-        encodedMessage
-      );
+      const toSign = byPassHashFunction
+        ? encodedMessage
+        : await this.hashTransactionPayload(
+            this.signerSpec.hashFunction,
+            this.signerSpec.curve,
+            encodedMessage
+          );
 
       const signedTx =
         this.signerSpec.curve === AdamikCurve.ED25519
           ? await this.signMessage(toSign)
-          : await this.signHash(toSign);
+          : await this.signDFNSHash(toSign);
 
       if (signedTx.status !== "Signed") {
         throw new Error(`Failed to sign transaction: ${signedTx.reason}`);
@@ -258,5 +263,9 @@ export class DfnsSigner implements BaseSigner {
       console.log(JSON.stringify(e, null, 2));
       throw e;
     }
+  }
+
+  public async signHash(hash: string): Promise<string> {
+    return this.signTransaction(hash, true);
   }
 }

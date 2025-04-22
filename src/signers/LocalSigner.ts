@@ -1,4 +1,7 @@
+import { Slip10, Slip10Curve, stringToPath } from "@cosmjs/crypto";
 import { HDNodeWallet, ethers } from "ethers";
+import { ec } from "starknet";
+import * as nacl from "tweetnacl";
 import {
   AdamikCurve,
   AdamikHashFunction,
@@ -6,9 +9,6 @@ import {
 } from "../adamik/types";
 import { extractSignature, infoTerminal } from "../utils";
 import { BaseSigner } from "./types";
-import * as nacl from "tweetnacl";
-import { ec } from "starknet";
-import { Bip39, Slip10, Slip10Curve, stringToPath } from "@cosmjs/crypto";
 
 /**
  * LocalSigner implements key derivation and signing for multiple curves:
@@ -135,7 +135,10 @@ export class LocalSigner implements BaseSigner {
     return buffer;
   }
 
-  async signTransaction(encodedMessage: string): Promise<string> {
+  async signTransaction(
+    encodedMessage: string,
+    byPassHashFunction = false
+  ): Promise<string> {
     infoTerminal(
       `Signing message with ${this.signerSpec.curve}`,
       this.signerName
@@ -144,29 +147,36 @@ export class LocalSigner implements BaseSigner {
     const messageBytes = Buffer.from(encodedMessage, "hex");
 
     let messageHash: Buffer;
-    switch (this.signerSpec.hashFunction) {
-      case AdamikHashFunction.SHA256:
-        messageHash = Buffer.from(ethers.sha256(messageBytes).slice(2), "hex");
-        break;
-      case AdamikHashFunction.KECCAK256:
-        messageHash = Buffer.from(
-          ethers.keccak256(messageBytes).slice(2),
-          "hex"
-        );
-        break;
-      case AdamikHashFunction.SHA512_256:
-        throw new Error("SHA512_256 not implemented");
-      case AdamikHashFunction.PEDERSEN: {
-        const x = messageBytes;
-        const y = Buffer.from("00", "hex");
-        const pedersenHash = ec.starkCurve.pedersen(x, y);
-        messageHash = Buffer.from(pedersenHash.slice(2), "hex");
-        break;
+    if (byPassHashFunction) {
+      messageHash = messageBytes;
+    } else {
+      switch (this.signerSpec.hashFunction) {
+        case AdamikHashFunction.SHA256:
+          messageHash = Buffer.from(
+            ethers.sha256(messageBytes).slice(2),
+            "hex"
+          );
+          break;
+        case AdamikHashFunction.KECCAK256:
+          messageHash = Buffer.from(
+            ethers.keccak256(messageBytes).slice(2),
+            "hex"
+          );
+          break;
+        case AdamikHashFunction.SHA512_256:
+          throw new Error("SHA512_256 not implemented");
+        case AdamikHashFunction.PEDERSEN: {
+          const x = messageBytes;
+          const y = Buffer.from("00", "hex");
+          const pedersenHash = ec.starkCurve.pedersen(x, y);
+          messageHash = Buffer.from(pedersenHash.slice(2), "hex");
+          break;
+        }
+        default:
+          throw new Error(
+            `Unsupported hash function: ${this.signerSpec.hashFunction}`
+          );
       }
-      default:
-        throw new Error(
-          `Unsupported hash function: ${this.signerSpec.hashFunction}`
-        );
     }
 
     switch (this.signerSpec.curve) {
@@ -207,5 +217,9 @@ export class LocalSigner implements BaseSigner {
     return this.signerSpec.hashFunction === AdamikHashFunction.SHA256
       ? ethers.sha256(input)
       : ethers.keccak256(input);
+  }
+
+  public async signHash(hash: string): Promise<string> {
+    return this.signTransaction(hash, true);
   }
 }
