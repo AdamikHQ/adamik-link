@@ -80,7 +80,7 @@ export const adamikLink = async () => {
 
   if (!continueTransaction) {
     infoTerminal("Transaction cancelled. Restarting...");
-    return;
+    return { chains, chainId, balance, address };
   }
 
   const transactionEncodeResponse = await encodeTransaction({
