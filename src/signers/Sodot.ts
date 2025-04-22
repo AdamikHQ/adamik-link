@@ -349,7 +349,7 @@ export class SodotSigner implements BaseSigner {
   private adamikHashFunctionToSodotHashMethod(
     hashAlgo: AdamikHashFunction,
     curve: AdamikCurve
-  ): "sha256" | "keccak256" | undefined {
+  ): "sha256" | "keccak256" | "none" | undefined {
     if (curve === AdamikCurve.ED25519) {
       return undefined;
     }
@@ -358,6 +358,8 @@ export class SodotSigner implements BaseSigner {
         return "sha256";
       case AdamikHashFunction.KECCAK256:
         return "keccak256";
+      case AdamikHashFunction.NONE:
+        return "none";
       default:
         throw new Error(`Unsupported hash algorithm: ${hashAlgo}`);
     }
@@ -395,5 +397,32 @@ export class SodotSigner implements BaseSigner {
     }
 
     return pubkey.compressed;
+  }
+
+  public async signHash(hash: string): Promise<string> {
+    const signature = await this.sign(
+      hash,
+      this.keyIds,
+      [44, Number(this.signerSpec.coinType), 0, 0, 0],
+      this.signerSpec.curve,
+      "none"
+    );
+
+    if (!signature) {
+      errorTerminal("Failed to sign hash with Sodot", this.signerName);
+      throw new Error("Failed to sign hash with Vertex");
+    }
+
+    infoTerminal("Signature from SODOT:", this.signerName);
+    await italicInfoTerminal(JSON.stringify(signature, null, 2));
+
+    if ("signature" in signature) {
+      return signature.signature;
+    }
+
+    return extractSignature(this.signerSpec.signatureFormat, {
+      ...signature,
+      v: signature.v.toString(16),
+    });
   }
 }

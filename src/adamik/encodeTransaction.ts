@@ -1,9 +1,9 @@
-import prompts from "prompts";
 import {
   amountToMainUnit,
   amountToSmallestUnit,
   errorTerminal,
   infoTerminal,
+  overridedPrompt,
 } from "../utils";
 import { deployAccount } from "./deployAccount";
 import {
@@ -27,12 +27,13 @@ export const encodeTransaction = async ({
   balance: AdamikBalance;
   pubkey?: string;
 }): Promise<AdamikTransactionEncodeResponse | undefined> => {
-  const { mode } = await prompts({
+  const { mode } = await overridedPrompt({
     type: "select",
     name: "mode",
     message: "What type of transaction do you want to perform?",
     choices: [
       { title: "Transfer", value: "transfer" },
+      { title: "Transfer Token", value: "transferToken" },
       { title: "Stake", value: "stake" },
     ],
     initial: 0,
@@ -40,33 +41,38 @@ export const encodeTransaction = async ({
 
   let recipientAddress = "";
   let targetValidatorAddress = "";
+  let tokenId = "";
 
-  if (mode === "transfer") {
-    const response = await prompts({
-      type: "text",
-      name: "recipientAddress",
-      message: "What is the recipient address ? (default is signer address)",
-      initial: senderAddress,
-    });
-    recipientAddress = response.recipientAddress;
+  switch (mode) {
+    case "transfer":
+      const response = await overridedPrompt({
+        type: "text",
+        name: "recipientAddress",
+        message: "What is the recipient address ? (default is signer address)",
+        initial: senderAddress,
+      });
+      recipientAddress = response.recipientAddress;
 
-    if (!recipientAddress) {
-      throw new Error("No recipient address provided");
-    }
-  } else {
-    const response = await prompts({
-      type: "text",
-      name: "targetValidatorAddress",
-      message: "What is the validator address you want to delegate to?",
-    });
-    targetValidatorAddress = response.targetValidatorAddress;
+      if (!recipientAddress) {
+        throw new Error("No recipient address provided");
+      }
+      break;
+    case "stake": {
+      const response = await overridedPrompt({
+        type: "text",
+        name: "targetValidatorAddress",
+        message: "What is the validator address you want to delegate to?",
+      });
+      targetValidatorAddress = response.targetValidatorAddress;
 
-    if (!targetValidatorAddress) {
-      throw new Error("No validator address provided");
+      if (!targetValidatorAddress) {
+        throw new Error("No validator address provided");
+      }
+      break;
     }
   }
 
-  const { amount } = await prompts({
+  const { amount } = await overridedPrompt({
     type: "text",
     name: "amount",
     message: `How much ${ticker} to ${mode}? (default is 0.1% of your balance)`,
@@ -94,6 +100,10 @@ export const encodeTransaction = async ({
       },
     },
   };
+
+  if (mode === "transferToken") {
+    requestBody.transaction.data.tokenId = tokenId;
+  }
 
   if (mode === "stake") {
     requestBody.transaction.data.targetValidatorAddress =
@@ -130,7 +140,7 @@ export const encodeTransaction = async ({
       transactionEncodeResponse.status.errors[0].message ===
       "Sender account does not exist"
     ) {
-      const { continueDeploy } = await prompts({
+      const { continueDeploy } = await overridedPrompt({
         type: "confirm",
         name: "continueDeploy",
         message:

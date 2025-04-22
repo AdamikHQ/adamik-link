@@ -1,5 +1,5 @@
-import prompts from "prompts";
 import { AdamikSignerSpec } from "../adamik/types";
+import { overridedPrompt } from "../utils";
 import { DfnsSigner } from "./Dfns";
 import { LocalSigner } from "./LocalSigner";
 import { SodotSigner } from "./Sodot";
@@ -17,7 +17,7 @@ export const signerSelector = async (
   chainId: string,
   signerSpec: AdamikSignerSpec
 ): Promise<BaseSigner> => {
-  const { signerName } = await prompts({
+  const { signerName } = await overridedPrompt({
     type: "select",
     name: "signerName",
     message:

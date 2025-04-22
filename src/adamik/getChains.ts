@@ -1,4 +1,4 @@
-import prompts from "prompts";
+import { overridedPrompt } from "../utils";
 import { AdamikChain } from "./types";
 
 export const adamikGetChains = async () => {
@@ -15,7 +15,7 @@ export const adamikGetChains = async () => {
     (await fetchAllChains.json()) as { chains: Record<string, AdamikChain> }
   ).chains;
 
-  const { chainId } = await prompts({
+  const { chainId } = await overridedPrompt({
     type: "autocomplete",
     name: "chainId",
     message: "Select a chain",

@@ -1,4 +1,4 @@
-import prompts from "prompts";
+import { overridedPrompt } from "../utils";
 import { AdamikAPIError, AdamikEncodePubkeyToAddressResponse } from "./types";
 
 export const encodePubKeyToAddress = async (
@@ -36,7 +36,7 @@ export const encodePubKeyToAddress = async (
     return addresses[0].address;
   }
 
-  const { address } = await prompts({
+  const { address } = await overridedPrompt({
     type: "select",
     name: "address",
     message: "Select the corresponding address for the pubkey you provided",
@@ -44,6 +44,7 @@ export const encodePubKeyToAddress = async (
       title: `${address.address} (${address.type})`,
       value: address.address,
     })),
+    initial: addresses[0].address,
   });
 
   if (!address) {
