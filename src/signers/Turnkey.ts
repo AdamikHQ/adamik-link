@@ -157,4 +157,31 @@ export class TurnkeySigner implements BaseSigner {
 
     return extractSignature(this.signerSpec.signatureFormat, txSignResult);
   }
+
+  public async signHash(hash: string): Promise<string> {
+    if (!this.pubKey) {
+      this.pubKey = await this.getPubkey();
+    }
+
+    const txSignResult = await this.turnkeyClient.apiClient().signRawPayload({
+      signWith: this.pubKey,
+      payload: hash,
+      encoding: "PAYLOAD_ENCODING_HEXADECIMAL",
+      hashFunction:
+        this.signerSpec.curve === AdamikCurve.ED25519
+          ? "HASH_FUNCTION_NOT_APPLICABLE"
+          : "HASH_FUNCTION_NO_OP",
+    });
+
+    infoTerminal(`Signature`);
+    await italicInfoTerminal(
+      JSON.stringify(
+        { r: txSignResult.r, s: txSignResult.s, v: txSignResult.v },
+        null,
+        2
+      )
+    );
+
+    return extractSignature(this.signerSpec.signatureFormat, txSignResult);
+  }
 }

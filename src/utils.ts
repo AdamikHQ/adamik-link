@@ -1,4 +1,5 @@
 import picocolors from "picocolors";
+import prompts from "prompts";
 import { AdamikSignatureFormat } from "./adamik/types";
 import { Signer } from "./signers";
 
@@ -145,4 +146,34 @@ export const extractSignature = (
   } else {
     throw new Error(`Unsupported signature format: ${signatureFormat}`);
   }
+};
+
+export const overridedPrompt = async <T extends { [key: string]: any }>(
+  args: any
+): Promise<T> => {
+  if (process.env.ADAMIK_E2E_TEST) {
+    const promptOverrides = process.env.ADAMIK_PROMPT_OVERRIDES
+      ? JSON.parse(process.env.ADAMIK_PROMPT_OVERRIDES)
+      : {};
+
+    if (Object.keys(promptOverrides).length === 0) {
+      throw new Error("No prompt overrides found");
+    }
+
+    if (args.name && promptOverrides[args.name] !== undefined) {
+      if (promptOverrides[args.name] === "default" && args.initial) {
+        console.log(
+          `[ADAMIK] Using prompt override for ${args.name}: ${args.initial}`
+        );
+        return { [args.name]: args.initial } as T;
+      }
+      return { [args.name]: promptOverrides[args.name] } as T;
+    }
+
+    console.warn(
+      `No prompt override found for ${JSON.stringify(args, null, 2)}`
+    );
+  }
+
+  return (await prompts(args)) as T;
 };

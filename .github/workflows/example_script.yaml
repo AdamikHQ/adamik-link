@@ -30,7 +30,7 @@ jobs:
           UNSECURE_LOCAL_SEED: ${{ secrets.UNSECURE_LOCAL_SEED }}
         run: |
           # Run tests and capture output while preserving exit code
-          pnpm run test 2>&1 | tee test-output.log
+          pnpm run test:docs 2>&1 | tee test-output.log
           exit ${PIPESTATUS[0]}  # Use the exit code from pnpm run test, not tee
         continue-on-error: true
 

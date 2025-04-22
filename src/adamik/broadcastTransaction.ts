@@ -1,5 +1,4 @@
-import prompts from "prompts";
-import { errorTerminal, infoTerminal } from "../utils";
+import { errorTerminal, infoTerminal, overridedPrompt } from "../utils";
 import {
   AdamikAPIError,
   AdamikBroadcastResponse,
@@ -11,7 +10,7 @@ export const broadcastTransaction = async (
   transactionEncodeResponse: AdamikTransactionEncodeResponse,
   signature: string
 ) => {
-  const { acceptBroadcast } = await prompts({
+  const { acceptBroadcast } = await overridedPrompt({
     type: "confirm",
     name: "acceptBroadcast",
     message: "Do you wish to broadcast the transaction?",
