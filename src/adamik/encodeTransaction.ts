@@ -50,7 +50,7 @@ export const encodeTransaction = async ({
       const response = await prompts({
         type: "select",
         name: "tokenId",
-        message: `Which token do you want to transfer?`,
+        message: `Which asset do you want to transfer?`,
         choices: [
           {
             title: ticker,
