@@ -43,6 +43,7 @@ export const encodeTransaction = async ({
   let mode = "";
   let tokenId = "";
   let token: any;
+  let tokenDecimals = decimals;
 
   if (verb === "transfer") {
     {
@@ -64,6 +65,9 @@ export const encodeTransaction = async ({
       tokenId = response.tokenId;
       mode = tokenId === "" ? "transfer" : "transferToken";
       token = balance.balances.tokens.find(t => t.token.id === tokenId);
+      if (token) {
+        tokenDecimals = parseInt(token.token.decimals);
+      }
     }
     {
       const response = await prompts({
@@ -102,7 +106,7 @@ export const encodeTransaction = async ({
     message: `How much ${tokenTicker} to ${verb}? (default is 0.1% of your balance)`,
     initial: amountToMainUnit(
       (balanceAvailable / 1000n).toString(),
-      decimals
+      tokenDecimals
     ) as string,
   });
 
@@ -120,7 +124,7 @@ export const encodeTransaction = async ({
         mode: mode,
         senderAddress: senderAddress,
         recipientAddress: recipientAddress,
-        amount: amountToSmallestUnit(amount, decimals),
+        amount: amountToSmallestUnit(amount, tokenDecimals),
         useMaxAmount: false,
       },
     },
