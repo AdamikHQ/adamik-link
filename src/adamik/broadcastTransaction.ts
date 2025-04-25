@@ -14,7 +14,7 @@ export const broadcastTransaction = async (
   const { acceptBroadcast } = await prompts({
     type: "confirm",
     name: "acceptBroadcast",
-    message: "Do you wish to broadcast the transaction ?",
+    message: "Do you wish to broadcast the transaction?",
     initial: true,
   });
 

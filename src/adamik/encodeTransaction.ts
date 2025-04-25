@@ -27,9 +27,9 @@ export const encodeTransaction = async ({
   balance: AdamikBalance;
   pubkey?: string;
 }): Promise<AdamikTransactionEncodeResponse | undefined> => {
-  const { mode } = await prompts({
+  const { verb } = await prompts({
     type: "select",
-    name: "mode",
+    name: "verb",
     message: "What type of transaction do you want to perform?",
     choices: [
       { title: "Transfer", value: "transfer" },
@@ -40,20 +40,50 @@ export const encodeTransaction = async ({
 
   let recipientAddress = "";
   let targetValidatorAddress = "";
+  let mode = "";
+  let tokenId = "";
+  let token: any;
+  let tokenDecimals = decimals;
 
-  if (mode === "transfer") {
-    const response = await prompts({
-      type: "text",
-      name: "recipientAddress",
-      message: "What is the recipient address ? (default is signer address)",
-      initial: senderAddress,
-    });
-    recipientAddress = response.recipientAddress;
+  if (verb === "transfer") {
+    {
+      const response = await prompts({
+        type: "select",
+        name: "tokenId",
+        message: `Which asset do you want to transfer?`,
+        choices: [
+          {
+            title: ticker,
+            value: "",
+          },
+          ...balance.balances.tokens.map(t => ({
+            value: t.token.id,
+            title: t.token.name,
+          })),
+        ]
+      });
+      tokenId = response.tokenId;
+      mode = tokenId === "" ? "transfer" : "transferToken";
+      token = balance.balances.tokens.find(t => t.token.id === tokenId);
+      if (token) {
+        tokenDecimals = parseInt(token.token.decimals);
+      }
+    }
+    {
+      const response = await prompts({
+        type: "text",
+        name: "recipientAddress",
+        message: "What is the recipient address? (default is signer address)",
+        initial: senderAddress,
+      });
+      recipientAddress = response.recipientAddress;
+    }
 
     if (!recipientAddress) {
       throw new Error("No recipient address provided");
     }
   } else {
+    mode = "stake";
     const response = await prompts({
       type: "text",
       name: "targetValidatorAddress",
@@ -66,13 +96,17 @@ export const encodeTransaction = async ({
     }
   }
 
+  const tokenTicker = token === undefined ? ticker : token.token.ticker;
+  const balanceAvailable = token === undefined ?
+    BigInt(balance.balances.native.available) :
+    BigInt(token.amount);
   const { amount } = await prompts({
     type: "text",
     name: "amount",
-    message: `How much ${ticker} to ${mode}? (default is 0.1% of your balance)`,
+    message: `How much ${tokenTicker} to ${verb}? (default is 0.1% of your balance)`,
     initial: amountToMainUnit(
-      (BigInt(balance.balances.native.available) / 1000n).toString(),
-      decimals
+      (balanceAvailable / 1000n).toString(),
+      tokenDecimals
     ) as string,
   });
 
@@ -86,10 +120,11 @@ export const encodeTransaction = async ({
     transaction: {
       data: {
         chainId: chainId,
+        tokenId: token?.token.id,
         mode: mode,
         senderAddress: senderAddress,
         recipientAddress: recipientAddress,
-        amount: amountToSmallestUnit(amount, decimals),
+        amount: amountToSmallestUnit(amount, tokenDecimals),
         useMaxAmount: false,
       },
     },
