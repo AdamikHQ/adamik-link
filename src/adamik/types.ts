@@ -24,6 +24,7 @@ export type AdamikSignerSpec = {
 };
 
 export type AdamikChain = {
+  id: string;
   name: string;
   family: string;
   ticker: string;
@@ -59,7 +60,7 @@ export type TokenStakingReward = {
   amount: string;
 };
 
-export type AdamikBalance = {
+export type AdamikAccountState = {
   balances: {
     native: {
       available: string;
@@ -84,17 +85,37 @@ export type AdamikBalance = {
   };
 };
 
+export type AdamikTransactionEncodeRequest = {
+  transaction: {
+    data: {
+      mode: string;
+      senderAddress: string;
+      senderPubKey?: string;
+      recipientAddress?: string;
+      targetValidatorAddress?: string;
+      tokenId?: string;
+      amount?: string;
+      useMaxAmount?: boolean;
+      memo?: string;
+      params?: any;
+    };
+  };
+};
+
 export type AdamikTransactionEncodeResponse = {
   chainId: string;
   transaction: {
     data: {
-      chainId: string;
       mode: string;
       senderAddress: string;
-      recipientAddress: string;
+      senderPubKey?: string;
+      recipientAddress?: string;
+      targetValidatorAddress?: string;
+      tokenId?: string;
       amount: string;
-      memo: string;
-      params: any;
+      useMaxAmount?: boolean;
+      memo?: string;
+      params?: any;
     };
     encoded: string;
   };

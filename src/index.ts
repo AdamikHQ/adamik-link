@@ -20,8 +20,8 @@ async function main() {
     picocolors.cyan(`
     █████╗ ██████╗  █████╗ ███╗   ███╗██╗██╗  ██╗      ██╗     ██╗███╗   ██╗██╗  ██╗
    ██╔══██╗██╔══██╗██╔══██╗████╗ ████║██║██║ ██╔╝      ██║     ██║████╗  ██║██║ ██╔╝
-   ███████║██║  ██║███████║██╔████╔██║██║█████╔╝       ██║     ██║██╔██╗ ██║█████╔╝ 
-   ██╔══██║██║  ██║██╔══██║██║╚██╔╝██║██║██╔═██╗       ██║     ██║██║╚██╗██║██╔═██╗ 
+   ███████║██║  ██║███████║██╔████╔██║██║█████╔╝       ██║     ██║██╔██╗ ██║█████╔╝
+   ██╔══██║██║  ██║██╔══██║██║╚██╔╝██║██║██╔═██╗       ██║     ██║██║╚██╗██║██╔═██╗
    ██║  ██║██████╔╝██║  ██║██║ ╚═╝ ██║██║██║  ██╗      ███████╗██║██║ ╚████║██║  ██╗
    ╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝  ╚═╝      ╚══════╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝
 
@@ -86,8 +86,8 @@ async function main() {
       infoTerminal("========================================");
 
       infoTerminal(`Fetching balance ...`, "Adamik");
-      const balance = await getAccountState(chainId, address);
-      await displayBalance(balance, chains, chainId);
+      const accountState = await getAccountState(chainId, address);
+      await displayBalance(accountState, chains, chainId);
 
       infoTerminal("========================================");
 
@@ -106,12 +106,10 @@ async function main() {
       }
 
       const transactionEncodeResponse = await encodeTransaction({
-        chainId,
+        chain: chains[chainId],
         senderAddress: address,
-        decimals: chains[chainId].decimals,
-        ticker: chains[chainId].ticker,
-        balance,
-        pubkey,
+        senderPubKey: pubkey,
+        accountState,
       });
 
       if (!transactionEncodeResponse) {

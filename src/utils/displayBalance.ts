@@ -1,19 +1,19 @@
 import Table from "cli-table3";
 import picocolors from "picocolors";
-import { AdamikBalance, AdamikChain } from "../adamik/types";
+import { AdamikAccountState, AdamikChain } from "../adamik/types";
 import { amountToMainUnit } from "../utils";
 
 export const displayBalance = (
-  balance: AdamikBalance,
+  accountState: AdamikAccountState,
   chains: Record<string, AdamikChain>,
   chainId: string
 ) => {
   // Check if there are any actual unconfirmed values to display
   // const hasUnconfirmed =
-  //   balance.balances.native.unconfirmed !== null &&
-  //   balance.balances.native.unconfirmed !== "0" &&
-  //   balance.balances.native.unconfirmed !== "-" &&
-  //   balance.balances.native.unconfirmed !== "null";
+  //   accountState.balances.native.unconfirmed !== null &&
+  //   accountState.balances.native.unconfirmed !== "0" &&
+  //   accountState.balances.native.unconfirmed !== "-" &&
+  //   accountState.balances.native.unconfirmed !== "null";
 
   // Main balance table - headers without unconfirmed column if no actual values
   const balanceTable = new Table({
@@ -43,19 +43,22 @@ export const displayBalance = (
     picocolors.bold(chains[chainId].ticker),
     picocolors.cyan(
       amountToMainUnit(
-        balance.balances.native.available,
+        accountState.balances.native.available,
         chains[chainId].decimals
       )
     ),
     picocolors.cyan(
-      amountToMainUnit(balance.balances.native.total, chains[chainId].decimals)
+      amountToMainUnit(
+        accountState.balances.native.total,
+        chains[chainId].decimals
+      )
     ),
     picocolors.italic(chains[chainId].name),
   ]);
 
   // Add token balances if they exist
-  if (balance.balances.tokens?.length > 0) {
-    balance.balances.tokens.forEach((token) => {
+  if (accountState.balances.tokens?.length > 0) {
+    accountState.balances.tokens.forEach((token) => {
       balanceTable.push([
         picocolors.bold(token.token.ticker),
         picocolors.cyan(
@@ -73,7 +76,7 @@ export const displayBalance = (
   console.log(balanceTable.toString() + "\n");
 
   // Show staking information if available
-  if (balance.balances.staking) {
+  if (accountState.balances.staking) {
     const stakingOverviewTable = new Table({
       style: { head: ["cyan"] },
       head: ["Total Staked", "Locked", "Unlocking", "Unlocked"],
@@ -82,25 +85,25 @@ export const displayBalance = (
     stakingOverviewTable.push([
       picocolors.cyan(
         amountToMainUnit(
-          balance.balances.staking.total,
+          accountState.balances.staking.total,
           chains[chainId].decimals
         )
       ),
       picocolors.cyan(
         amountToMainUnit(
-          balance.balances.staking.locked,
+          accountState.balances.staking.locked,
           chains[chainId].decimals
         )
       ),
       picocolors.cyan(
         amountToMainUnit(
-          balance.balances.staking.unlocking,
+          accountState.balances.staking.unlocking,
           chains[chainId].decimals
         )
       ),
       picocolors.cyan(
         amountToMainUnit(
-          balance.balances.staking.unlocked,
+          accountState.balances.staking.unlocked,
           chains[chainId].decimals
         )
       ),
@@ -110,13 +113,13 @@ export const displayBalance = (
     console.log(stakingOverviewTable.toString());
 
     // Show staking positions
-    if (balance.balances.staking.positions.length > 0) {
+    if (accountState.balances.staking.positions.length > 0) {
       const positionsTable = new Table({
         style: { head: ["cyan"] },
         head: ["Validator", "Amount", "Status", "Completion Date"],
       });
 
-      balance.balances.staking.positions.forEach((pos) => {
+      accountState.balances.staking.positions.forEach((pos) => {
         positionsTable.push([
           picocolors.yellow(pos.validatorAddresses[0]),
           picocolors.cyan(
@@ -135,8 +138,8 @@ export const displayBalance = (
 
     // Show staking rewards
     if (
-      balance.balances.staking.rewards.native.length > 0 ||
-      balance.balances.staking.rewards.tokens.length > 0
+      accountState.balances.staking.rewards.native.length > 0 ||
+      accountState.balances.staking.rewards.tokens.length > 0
     ) {
       const rewardsTable = new Table({
         style: { head: ["cyan"] },
@@ -144,7 +147,7 @@ export const displayBalance = (
       });
 
       // Native rewards
-      balance.balances.staking.rewards.native.forEach((reward) => {
+      accountState.balances.staking.rewards.native.forEach((reward) => {
         rewardsTable.push([
           picocolors.bold(chains[chainId].ticker),
           picocolors.yellow(reward.validatorAddress),
@@ -155,7 +158,7 @@ export const displayBalance = (
       });
 
       // Token rewards
-      balance.balances.staking.rewards.tokens.forEach((reward) => {
+      accountState.balances.staking.rewards.tokens.forEach((reward) => {
         rewardsTable.push([
           picocolors.bold(reward.token.ticker),
           picocolors.yellow(reward.validatorAddress),

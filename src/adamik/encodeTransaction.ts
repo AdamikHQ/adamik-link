@@ -8,24 +8,22 @@ import {
 import { deployAccount } from "./deployAccount";
 import {
   AdamikAPIError,
-  AdamikBalance,
+  AdamikAccountState,
+  AdamikChain,
+  AdamikTransactionEncodeRequest,
   AdamikTransactionEncodeResponse,
 } from "./types";
 
 export const encodeTransaction = async ({
-  chainId,
+  chain,
   senderAddress,
-  decimals,
-  ticker,
-  balance,
-  pubkey,
+  senderPubKey,
+  accountState,
 }: {
-  chainId: string;
+  chain: AdamikChain;
   senderAddress: string;
-  decimals: number;
-  ticker: string;
-  balance: AdamikBalance;
-  pubkey?: string;
+  senderPubKey?: string;
+  accountState: AdamikAccountState;
 }): Promise<AdamikTransactionEncodeResponse | undefined> => {
   const { verb } = await prompts({
     type: "select",
@@ -38,75 +36,109 @@ export const encodeTransaction = async ({
     initial: 0,
   });
 
-  let recipientAddress = "";
-  let targetValidatorAddress = "";
-  let mode = "";
-  let tokenId = "";
-  let token: any;
-  let tokenDecimals = decimals;
+  const requestBody: AdamikTransactionEncodeRequest = {
+    transaction: {
+      data: {
+        mode: "",
+        senderAddress,
+      },
+    },
+  };
 
-  if (verb === "transfer") {
-    {
-      const response = await prompts({
-        type: "select",
-        name: "tokenId",
-        message: `Which asset do you want to transfer?`,
-        choices: [
-          {
-            title: ticker,
-            value: "",
-          },
-          ...balance.balances.tokens.map(t => ({
-            value: t.token.id,
-            title: t.token.name,
-          })),
-        ]
-      });
-      tokenId = response.tokenId;
-      mode = tokenId === "" ? "transfer" : "transferToken";
-      token = balance.balances.tokens.find(t => t.token.id === tokenId);
-      if (token) {
-        tokenDecimals = parseInt(token.token.decimals);
-      }
-    }
-    {
-      const response = await prompts({
-        type: "text",
-        name: "recipientAddress",
-        message: "What is the recipient address? (default is signer address)",
-        initial: senderAddress,
-      });
-      recipientAddress = response.recipientAddress;
-    }
-
-    if (!recipientAddress) {
-      throw new Error("No recipient address provided");
-    }
-  } else {
-    mode = "stake";
-    const response = await prompts({
-      type: "text",
-      name: "targetValidatorAddress",
-      message: "What is the validator address you want to delegate to?",
-    });
-    targetValidatorAddress = response.targetValidatorAddress;
-
-    if (!targetValidatorAddress) {
-      throw new Error("No validator address provided");
-    }
+  if (senderPubKey) {
+    requestBody.transaction.data.senderPubKey = senderPubKey;
   }
 
-  const tokenTicker = token === undefined ? ticker : token.token.ticker;
-  const balanceAvailable = token === undefined ?
-    BigInt(balance.balances.native.available) :
-    BigInt(token.amount);
+  switch (verb) {
+    case "transfer":
+      {
+        {
+          const assetChoices = [];
+          assetChoices.push({
+            title: chain.ticker,
+            value: undefined,
+          });
+
+          if (
+            chain.supportedFeatures.write.transaction.type.transferToken ===
+            true
+          ) {
+            accountState.balances.tokens.forEach((t) =>
+              assetChoices.push({
+                value: t.token.id,
+                title: t.token.name,
+              })
+            );
+          }
+          const { tokenId } = await prompts({
+            type: "select",
+            name: "tokenId",
+            message: `Which asset do you want to transfer?`,
+            choices: assetChoices,
+          });
+
+          if (tokenId) {
+            requestBody.transaction.data.tokenId = tokenId;
+            requestBody.transaction.data.mode = "transferToken";
+          } else {
+            requestBody.transaction.data.mode = "transfer";
+          }
+        }
+        {
+          const { recipientAddress } = await prompts({
+            type: "text",
+            name: "recipientAddress",
+            message:
+              "What is the recipient address? (default is signer address)",
+            initial: senderAddress,
+          });
+
+          if (!recipientAddress) {
+            throw new Error("No recipient address provided");
+          }
+
+          requestBody.transaction.data.recipientAddress = recipientAddress;
+        }
+      }
+      break;
+    case "stake":
+      {
+        requestBody.transaction.data.mode = "stake";
+
+        const { targetValidatorAddress } = await prompts({
+          type: "text",
+          name: "targetValidatorAddress",
+          message: "What is the validator address you want to delegate to?",
+        });
+        if (!targetValidatorAddress) {
+          throw new Error("No validator address provided");
+        }
+
+        requestBody.transaction.data.targetValidatorAddress =
+          targetValidatorAddress;
+      }
+      break;
+    default:
+      throw new Error("Unsupported transaction mode");
+  }
+
+  const token = accountState.balances.tokens.find(
+    (t) => t.token.id === requestBody.transaction.data.tokenId
+  );
+
+  const assetTicker = token ? token.token.ticker : chain.ticker;
+  const assetDecimals = token ? parseInt(token.token.decimals) : chain.decimals;
+  const balanceAvailable = token
+    ? BigInt(token.amount)
+    : BigInt(accountState.balances.native.available);
+
   const { amount } = await prompts({
     type: "text",
     name: "amount",
-    message: `How much ${tokenTicker} to ${verb}? (default is 0.1% of your balance)`,
+    message: `How much ${assetTicker} to ${verb}? (default is 0.1% of your balance)`,
     initial: amountToMainUnit(
       (balanceAvailable / 1000n).toString(),
-      tokenDecimals
+      assetDecimals
     ) as string,
   });
 
@@ -114,33 +146,18 @@ export const encodeTransaction = async ({
     throw new Error("No amount provided");
   }
 
-  infoTerminal(`Encoding ${mode} transaction...`, "Adamik");
+  requestBody.transaction.data.amount = amountToSmallestUnit(
+    amount,
+    assetDecimals
+  ).toString();
 
-  const requestBody: any = {
-    transaction: {
-      data: {
-        chainId: chainId,
-        tokenId: token?.token.id,
-        mode: mode,
-        senderAddress: senderAddress,
-        recipientAddress: recipientAddress,
-        amount: amountToSmallestUnit(amount, tokenDecimals),
-        useMaxAmount: false,
-      },
-    },
-  };
-
-  if (mode === "stake") {
-    requestBody.transaction.data.targetValidatorAddress =
-      targetValidatorAddress;
-  }
-
-  if (pubkey) {
-    requestBody.transaction.data.senderPubKey = pubkey;
-  }
+  infoTerminal(
+    `Encoding ${requestBody.transaction.data.mode} transaction...`,
+    "Adamik"
+  );
 
   const postTransactionEncode = await fetch(
-    `${process.env.ADAMIK_API_BASE_URL}/api/${chainId}/transaction/encode`,
+    `${process.env.ADAMIK_API_BASE_URL}/api/${chain.id}/transaction/encode`,
     {
       method: "POST",
       headers: {
@@ -169,14 +186,14 @@ export const encodeTransaction = async ({
         type: "confirm",
         name: "continueDeploy",
         message:
-          "It's seems that account is not deployed, do you want to craft a deploy transaction (will not be broadcasted yet) ?",
+          "It seems that account is not deployed, do you want to craft a deploy account transaction (will not be broadcasted yet)?",
         initial: true,
       });
 
       if (continueDeploy) {
         const deployTransactionEncodeResponse = await deployAccount({
-          chainId,
-          pubkey,
+          chainId: chain.id,
+          pubkey: senderPubKey,
         });
 
         return deployTransactionEncodeResponse;
