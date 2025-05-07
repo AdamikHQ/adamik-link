@@ -130,32 +130,43 @@ export const adamikLink = async () => {
     return;
   }
 
+  const choices = transactionEncodeResponse.transaction.encoded.reduce(
+    (acc, encoded) => {
+      if (encoded.hash) {
+        acc.push({
+          title: `Hash (${encoded.hash.format}) : ${encoded.hash.value}`,
+          value: encoded.hash.format,
+        });
+      }
+      if (encoded.raw) {
+        acc.push({
+          title: `Raw (${encoded.raw.format}) : ${encoded.raw.value}`,
+          value: encoded.raw.format,
+        });
+      }
+      return acc;
+    },
+    [] as { title: string; value: string }[]
+  );
+
   const { toSign } = await overridedPrompt({
     type: "select",
     name: "toSign",
     message: "Which format do you want to sign with ?",
-    choices: transactionEncodeResponse.transaction.encoded.flatMap((encoded) =>
-      [
-        encoded.hash && {
-          title: `Hash (${encoded.hash.format}) : ${encoded.hash.value}`,
-          value: encoded.hash.format,
-        },
-        encoded.raw && {
-          title: `Raw (${encoded.raw.format}) : ${encoded.raw.value}`,
-          value: encoded.raw.format,
-        },
-      ].filter(Boolean)
-    ),
-    initial: transactionEncodeResponse.transaction.encoded[0].hash?.format,
+    choices,
   });
 
   const isHashPayload = transactionEncodeResponse.transaction.encoded.find(
     (encoded) => encoded.hash?.format === toSign
   )?.hash?.value;
 
+  console.log("isHashPayload", isHashPayload);
+
   const isRawPayload = transactionEncodeResponse.transaction.encoded.find(
     (encoded) => encoded.raw?.format === toSign
   )?.raw?.value;
+
+  console.log("isRawPayload", isRawPayload);
 
   if (!isHashPayload && !isRawPayload) {
     errorTerminal(`Encoding format ${toSign} doesn't seems to exist`, "Adamik");
