@@ -1,5 +1,6 @@
 import { Turnkey } from "@turnkey/sdk-server";
 import {
+  AdamikChain,
   AdamikCurve,
   AdamikHashFunction,
   AdamikSignerSpec,
@@ -10,20 +11,19 @@ import {
   infoTerminal,
   italicInfoTerminal,
 } from "../utils";
-import { Signer } from "./index";
-import { BaseSigner } from "./types";
+import { SignerType, BaseSigner } from "./types";
 
 export class TurnkeySigner implements BaseSigner {
   private turnkeyClient: Turnkey;
-  public chainId: string;
+  public chain: AdamikChain;
   public signerSpec: AdamikSignerSpec;
-  public signerName = Signer.TURNKEY;
+  public signerName = SignerType.TURNKEY;
 
   private pubKey: string | undefined;
 
-  constructor(chainId: string, signerSpec: AdamikSignerSpec) {
+  constructor(chain: AdamikChain, signerSpec: AdamikSignerSpec) {
     infoTerminal("Initializing Turnkey signer...", this.signerName);
-    this.chainId = chainId;
+    this.chain = chain;
     this.signerSpec = signerSpec;
 
     this.turnkeyClient = new Turnkey({

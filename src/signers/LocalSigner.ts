@@ -1,5 +1,6 @@
 import { HDNodeWallet, ethers } from "ethers";
 import {
+  AdamikChain,
   AdamikCurve,
   AdamikHashFunction,
   AdamikSignerSpec,
@@ -9,6 +10,7 @@ import { BaseSigner } from "./types";
 import * as nacl from "tweetnacl";
 import { ec } from "starknet";
 import { Bip39, Slip10, Slip10Curve, stringToPath } from "@cosmjs/crypto";
+import { SignerType } from "./types";
 
 /**
  * LocalSigner implements key derivation and signing for multiple curves:
@@ -34,9 +36,9 @@ export class LocalSigner implements BaseSigner {
   private wallet: HDNodeWallet | null = null;
   private ed25519KeyPair: nacl.SignKeyPair | null = null;
   private starkPrivateKey: string | null = null;
-  public signerName = "LOCAL_UNSECURE";
+  public signerName = SignerType.LOCAL;
 
-  constructor(public chainId: string, public signerSpec: AdamikSignerSpec) {
+  constructor(public chain: AdamikChain, public signerSpec: AdamikSignerSpec) {
     if (!process.env.UNSECURE_LOCAL_SEED) {
       throw new Error(
         "UNSECURE_LOCAL_SEED is not set in environment variables"
@@ -44,8 +46,10 @@ export class LocalSigner implements BaseSigner {
     }
   }
 
-  static isConfigValid(): boolean {
-    return !!process.env.UNSECURE_LOCAL_SEED;
+  static isConfigValid() {
+    if (!process.env.UNSECURE_LOCAL_SEED) {
+      throw new Error("UNSECURE_LOCAL_SEED is not set");
+    }
   }
 
   private async getSecp256k1Wallet(): Promise<HDNodeWallet> {
