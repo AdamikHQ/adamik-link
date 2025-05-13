@@ -93,6 +93,8 @@ export type AdamikTransactionEncodeRequest = {
       senderPubKey?: string;
       recipientAddress?: string;
       targetValidatorAddress?: string;
+      validatorAddress?: string;
+      stakeId?: string;
       tokenId?: string;
       amount?: string;
       useMaxAmount?: boolean;

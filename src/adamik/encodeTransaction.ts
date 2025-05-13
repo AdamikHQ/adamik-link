@@ -32,6 +32,7 @@ export const encodeTransaction = async ({
     choices: [
       { title: "Transfer", value: "transfer" },
       { title: "Stake", value: "stake" },
+      { title: "Unstake", value: "unstake" },
     ],
     initial: 0,
   });
@@ -116,6 +117,29 @@ export const encodeTransaction = async ({
 
         requestBody.transaction.data.targetValidatorAddress =
           targetValidatorAddress;
+      }
+      break;
+    case "unstake":
+      {
+        requestBody.transaction.data.mode = "unstake";
+
+        const { validatorAddress } = await prompts({
+          type: "text",
+          name: "validatorAddress",
+          message: "What is the validator address you want to undelegate from?",
+        });
+
+        const { stakeId } = await prompts({
+          type: "text",
+          name: "stakeId",
+          message: "What is the stake id you want to undelegate ? (optional)",
+        });
+
+        requestBody.transaction.data.validatorAddress = validatorAddress;
+
+        if (stakeId) {
+          requestBody.transaction.data.stakeId = stakeId;
+        }
       }
       break;
     default:
