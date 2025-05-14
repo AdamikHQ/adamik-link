@@ -1,9 +1,13 @@
 import * as dotenv from "dotenv";
 import * as path from "path";
-import prompts from "prompts";
-import { getTransactionDetails } from "../adamik/getTransactionDetails";
 import { adamikGetChains } from "../adamik/getChains";
-import { infoTerminal, errorTerminal, italicInfoTerminal } from "../utils";
+import { getTransactionDetails } from "../adamik/getTransactionDetails";
+import {
+  errorTerminal,
+  infoTerminal,
+  italicInfoTerminal,
+  overridedPrompt,
+} from "../utils";
 import { transactionDetailView } from "../utils/displayTransaction";
 
 // Load environment variables
@@ -19,11 +23,12 @@ async function testTransaction() {
       return;
     }
 
-    const { txHash } = await prompts({
+    const { txHash } = await overridedPrompt({
       type: "text",
       name: "txHash",
       message: "Enter the transaction hash to check:",
-      validate: (value) => value.length > 0 || "Transaction hash is required",
+      validate: (value: string) =>
+        value.length > 0 || "Transaction hash is required",
     });
 
     if (!txHash) {
@@ -61,7 +66,7 @@ async function testTransaction() {
 
 async function main() {
   while (true) {
-    const { startProcess } = await prompts({
+    const { startProcess } = await overridedPrompt({
       type: "confirm",
       name: "startProcess",
       message: "Check another transaction? (No to exit)",

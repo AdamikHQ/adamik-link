@@ -1,9 +1,9 @@
-import prompts from "prompts";
 import {
   amountToMainUnit,
   amountToSmallestUnit,
   errorTerminal,
   infoTerminal,
+  overridedPrompt,
 } from "../utils";
 import { deployAccount } from "./deployAccount";
 import {
@@ -25,7 +25,7 @@ export const encodeTransaction = async ({
   senderPubKey?: string;
   accountState: AdamikAccountState;
 }): Promise<AdamikTransactionEncodeResponse | undefined> => {
-  const { verb } = await prompts({
+  const { verb } = await overridedPrompt({
     type: "select",
     name: "verb",
     message: "What type of transaction do you want to perform?",
@@ -57,7 +57,7 @@ export const encodeTransaction = async ({
           const assetChoices = [];
           assetChoices.push({
             title: chain.ticker,
-            value: undefined,
+            value: null,
           });
 
           if (
@@ -71,11 +71,12 @@ export const encodeTransaction = async ({
               })
             );
           }
-          const { tokenId } = await prompts({
+          const { tokenId } = await overridedPrompt({
             type: "select",
             name: "tokenId",
             message: `Which asset do you want to transfer?`,
             choices: assetChoices,
+            initial: assetChoices[0].value,
           });
 
           if (tokenId) {
@@ -86,7 +87,7 @@ export const encodeTransaction = async ({
           }
         }
         {
-          const { recipientAddress } = await prompts({
+          const { recipientAddress } = await overridedPrompt({
             type: "text",
             name: "recipientAddress",
             message:
@@ -106,7 +107,7 @@ export const encodeTransaction = async ({
       {
         requestBody.transaction.data.mode = "stake";
 
-        const { targetValidatorAddress } = await prompts({
+        const { targetValidatorAddress } = await overridedPrompt({
           type: "text",
           name: "targetValidatorAddress",
           message: "What is the validator address you want to delegate to?",
@@ -123,13 +124,13 @@ export const encodeTransaction = async ({
       {
         requestBody.transaction.data.mode = "unstake";
 
-        const { validatorAddress } = await prompts({
+        const { validatorAddress } = await overridedPrompt({
           type: "text",
           name: "validatorAddress",
           message: "What is the validator address you want to undelegate from?",
         });
 
-        const { stakeId } = await prompts({
+        const { stakeId } = await overridedPrompt({
           type: "text",
           name: "stakeId",
           message: "What is the stake id you want to undelegate ? (optional)",
@@ -156,7 +157,7 @@ export const encodeTransaction = async ({
     ? BigInt(token.amount)
     : BigInt(accountState.balances.native.available);
 
-  const { amount } = await prompts({
+  const { amount } = await overridedPrompt({
     type: "text",
     name: "amount",
     message: `How much ${assetTicker} to ${verb}? (default is 0.1% of your balance)`,
@@ -206,7 +207,7 @@ export const encodeTransaction = async ({
       transactionEncodeResponse.status.errors[0].message ===
       "Sender account does not exist"
     ) {
-      const { continueDeploy } = await prompts({
+      const { continueDeploy } = await overridedPrompt({
         type: "confirm",
         name: "continueDeploy",
         message:

@@ -1,8 +1,9 @@
-name: Test Runner
+name: E2E Tests
 
 on:
   schedule:
-    - cron: "5 8 * * *"
+    - cron: "0 8 * * 1" # Every Monday at 8 AM
+    - cron: "0 8 * * 5" # Every Friday at 8 AM
   workflow_dispatch: # Allows manual triggering
 
 jobs:
@@ -19,40 +20,54 @@ jobs:
         with:
           node-version: 22
           cache: "pnpm"
+
       - name: Install dependencies
         run: pnpm install
 
-      - name: Run tests
+      - name: Run e2e tests
         id: run-tests
         env:
+          # Adamik
+          ADAMIK_API_BASE_URL: ${{ secrets.ADAMIK_API_BASE_URL }}
           ADAMIK_API_KEY: ${{ secrets.ADAMIK_API_KEY }}
-          STARKNET_PRIVATE_KEY: ${{ secrets.STARKNET_PRIVATE_KEY }}
-          UNSECURE_LOCAL_SEED: ${{ secrets.UNSECURE_LOCAL_SEED }}
+
+          # Turnkey
+          TURNKEY_API_PUBLIC_KEY: ${{ secrets.TURNKEY_API_PUBLIC_KEY }}
+          TURNKEY_API_PRIVATE_KEY: ${{ secrets.TURNKEY_API_PRIVATE_KEY }}
+          TURNKEY_BASE_URL: ${{ secrets.TURNKEY_BASE_URL }}
+          TURNKEY_ORGANIZATION_ID: ${{ secrets.TURNKEY_ORGANIZATION_ID }}
+          TURNKEY_WALLET_ID: ${{ secrets.TURNKEY_WALLET_ID }}
+
+          # Sodot
+          SODOT_VERTEX_URL_0: ${{ secrets.SODOT_VERTEX_URL_0 }}
+          SODOT_VERTEX_API_KEY_0: ${{ secrets.SODOT_VERTEX_API_KEY_0 }}
+          SODOT_VERTEX_URL_1: ${{ secrets.SODOT_VERTEX_URL_1 }}
+          SODOT_VERTEX_API_KEY_1: ${{ secrets.SODOT_VERTEX_API_KEY_1 }}
+          SODOT_VERTEX_URL_2: ${{ secrets.SODOT_VERTEX_URL_2 }}
+          SODOT_VERTEX_API_KEY_2: ${{ secrets.SODOT_VERTEX_API_KEY_2 }}
+          SODOT_EXISTING_ECDSA_KEY_IDS: ${{ secrets.SODOT_EXISTING_ECDSA_KEY_IDS }}
+          SODOT_EXISTING_ED25519_KEY_IDS: ${{ secrets.SODOT_EXISTING_ED25519_KEY_IDS }}
+
+          # Dfns
+          DFNS_API_URL: ${{ secrets.DFNS_API_URL }}
+          DFNS_CRED_ID: ${{ secrets.DFNS_CRED_ID }}
+          DFNS_PRIVATE_KEY: ${{ secrets.DFNS_PRIVATE_KEY }}
+          DFNS_APP_ID: ${{ secrets.DFNS_APP_ID }}
+          DFNS_AUTH_TOKEN: ${{ secrets.DFNS_AUTH_TOKEN }}
         run: |
           # Run tests and capture output while preserving exit code
-          pnpm run test:docs 2>&1 | tee test-output.log
+          pnpm run test:e2e 2>&1 | tee test-output.log
           exit ${PIPESTATUS[0]}  # Use the exit code from pnpm run test, not tee
         continue-on-error: true
 
-      - name: Extract balances
-        run: |
-          # Extract all balance lines and format them
-          BALANCES=$(grep -o '\[BALANCE\].*' test-output.log | sort -u)
-          echo "BALANCE_INFO<<EOF" >> $GITHUB_ENV
-          if [ -n "$BALANCES" ]; then
-            echo "$BALANCES" >> $GITHUB_ENV
-            # Write to GitHub Actions summary
-            echo "### 💰 Balance Information" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            echo "$BALANCES" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          else
-            echo "No balance information found" >> $GITHUB_ENV
-            # Write to GitHub Actions summary
-            echo "### 💰 Balance Information" >> $GITHUB_STEP_SUMMARY
-            echo "No balance information found" >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "EOF" >> $GITHUB_ENV
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: |
+            test-output.log
+            test-reports/*.md
+          retention-days: 7
 
       - name: Check test results
         run: |
@@ -71,17 +86,13 @@ jobs:
           status: "failure" # Always failure since we only notify on failures
           fields: repo,message,commit,author,action,eventName,ref,workflow,job,took
           text: |
-            :rotating_light: *TEST RUNNER WORKFLOW FAILED!* :rotating_light:
+            :rotating_light: *E2E TESTS FAILED!* :rotating_light:
             :github: *Repository:* ${{ github.repository }}
             :bust_in_silhouette: *Triggered by:* ${{ github.actor }}
             :github: *Branch:* ${{ github.ref_name }}
 
-            :moneybag: *Balance Information:*
-            ```
-            ${{ env.BALANCE_INFO }}
-            ```
-
             :link: *View Run:* https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            :file_folder: *Download Results:* https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts
 
             :warning: Check the workflow logs for more details :mag_right:
         env:

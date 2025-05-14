@@ -9,6 +9,7 @@ export enum AdamikHashFunction {
   KECCAK256 = "keccak256",
   PEDERSEN = "pedersen",
   SHA512_256 = "sha512_256",
+  NONE = "none",
 }
 
 export enum AdamikSignatureFormat {
@@ -119,7 +120,10 @@ export type AdamikTransactionEncodeResponse = {
       memo?: string;
       params?: any;
     };
-    encoded: string;
+    encoded: Array<{
+      hash?: { format: string; value: string };
+      raw?: { format: string; value: string };
+    }>;
   };
   status: {
     errors: {
