@@ -67,6 +67,11 @@ export const adamikLink = async () => {
   const accountState = await getAccountState(chainId, address);
   displayBalance(accountState, chains, chainId);
 
+  if (accountState.balances.native.available === "0") {
+    errorTerminal("Insufficient balance", "Adamik");
+    throw new Error(`Balance is 0 for : ${address}`);
+  }
+
   infoTerminal("========================================");
 
   infoTerminal(`We will now prepare an unsigned transaction ...`);
@@ -80,7 +85,7 @@ export const adamikLink = async () => {
 
   if (!continueTransaction) {
     infoTerminal("Transaction cancelled. Restarting...");
-    return { chains, chainId, balance, address };
+    return { chains, chainId, accountState, address };
   }
 
   const transactionEncodeResponse = await encodeTransaction({

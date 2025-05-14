@@ -2,8 +2,8 @@ import { expect } from "chai";
 import * as dotenv from "dotenv";
 import * as path from "path";
 import {
+  AdamikAccountState,
   AdamikAPIError,
-  AdamikBalance,
   AdamikBroadcastResponse,
   AdamikChain,
 } from "../../src/adamik/types";
@@ -16,7 +16,7 @@ const familyEncodedFormats = [
     chainId: ["ton"],
     signerName: ["SODOT", "TURNKEY"],
     encodedFormats: [
-      "HASH_SHA256", // TON uses SHA256 hash of the transaction
+      "sha256", // TON uses SHA256 hash of the transaction
     ],
   },
   {
@@ -25,16 +25,16 @@ const familyEncodedFormats = [
     chainId: ["sepolia"],
     encodedFormats: [
       // "RLP", // Raw transaction in RLP format
-      "HASH_KECCAK256", // Keccak256 hash of the transaction
+      "keccak256", // Keccak256 hash of the transaction
     ],
   },
   {
     family: "cosmos",
     chainId: ["cosmoshub"],
-    signerName: ["TURNKEY", "SODOT"],
+    signerName: ["TURNKEY"],
     encodedFormats: [
-      "SIGNDOC_DIRECT", // Direct sign document format
-      "HASH_SHA256", // SHA256 hash of the transaction
+      // "SIGNDOC_DIRECT", // Direct sign document format
+      "sha256", // SHA256 hash of the transaction
     ],
   },
   {
@@ -43,36 +43,37 @@ const familyEncodedFormats = [
     chainId: ["tron"],
     encodedFormats: [
       "RAW_TRANSACTION", // Raw transaction data
-      "HASH_SHA256", // SHA256 hash of the transaction
+      "sha256", // SHA256 hash of the transaction
     ],
     overrideParams: {
       recipientAddress: "TRFc31J1drV7C8CYYjhpJxTxBe1Muf7MGg", // We can't self send in Tron
     },
   },
-  // {
-  //   family: "algorand",
-  //   chainId: ["algorand"],
-  //   signerName: ["TURNKEY"],
-  //   encodedFormats: [
-  // "MSGPACK", // MessagePack format for Algorand transactions
-  // "HASH_SHA512_256", // SHA256 hash of the transaction
-  //   ],
-  // },
-  // {
-  //   family: "starknet",
-  //   chainId: ["starknet"],
-  //   signerName: ["DFNS"],
-  //   encodedFormats: [
-  //     "HASH_PEDERSEN", // Pedersen hash format for Starknet transactions
-  //   ],
-  // },
+  {
+    family: "algorand",
+    chainId: ["algorand"],
+    signerName: ["TURNKEY"],
+    encodedFormats: [
+      "MSGPACK", // MessagePack format for Algorand transactions
+      "sha512_256", // SHA256 hash of the transaction
+    ],
+  },
+  {
+    family: "starknet",
+    chainId: ["starknet"],
+    signerName: ["DFNS"],
+    encodedFormats: [
+      "pedersen", // Pedersen hash format for Starknet transactions
+    ],
+  },
 ];
 
 const commonConfig = {
   startProcess: true,
   chainId: "ton",
   signerName: "SODOT",
-  mode: "transfer",
+  verb: "transfer",
+  tokenId: null,
   recipientAddress: "default",
   amount: "default",
   continueTransaction: true,
@@ -82,7 +83,7 @@ const commonConfig = {
   startNewTransaction: false,
   continueDeploy: true,
   address: "default",
-  toSign: "HASH_SHA256",
+  toSign: "SHA256",
 };
 
 describe("adamikLink", () => {
@@ -165,7 +166,7 @@ describe("adamikLink", () => {
     chain: string;
     signer: string;
     status: "PASS" | "FAIL";
-    balance: AdamikBalance | undefined;
+    accountState: AdamikAccountState | undefined;
     chainInfo: AdamikChain | undefined;
     error?: string;
     address?: string;
@@ -191,18 +192,18 @@ describe("adamikLink", () => {
                     const result = (await adamikLink()) as {
                       chains: Record<string, AdamikChain>;
                       chainId: string;
-                      balance: AdamikBalance;
+                      accountState: AdamikAccountState;
                       address: string;
                     };
 
-                    expect(result.balance).to.be.an("object");
+                    expect(result.accountState).to.be.an("object");
 
                     balanceTestResults.push({
                       family,
                       chain: result.chainId,
                       signer,
                       status: "PASS",
-                      balance: result.balance,
+                      accountState: result.accountState,
                       address: result.address,
                       chainInfo: result.chains[result.chainId],
                     });
@@ -212,7 +213,7 @@ describe("adamikLink", () => {
                       chain,
                       signer,
                       status: "FAIL",
-                      balance: undefined,
+                      accountState: undefined,
                       chainInfo: undefined,
                       error:
                         error instanceof Error ? error.message : String(error),
@@ -283,8 +284,8 @@ describe("adamikLink", () => {
         result.status === "PASS" ? `✅ PASS`.padEnd(6) : `❌ FAIL`.padEnd(6);
 
       let balanceText = "No balance data";
-      if (result.status === "PASS" && result.balance && result.chainInfo) {
-        const nativeBalance = result.balance.balances.native;
+      if (result.status === "PASS" && result.accountState && result.chainInfo) {
+        const nativeBalance = result.accountState.balances.native;
         const decimals = result.chainInfo.decimals;
         const ticker = result.chainInfo.ticker;
         const available = amountToMainUnit(nativeBalance.available, decimals);
@@ -308,8 +309,8 @@ describe("adamikLink", () => {
         balanceText += `│           │           │             │        │ ${ticker}: ${available} (Available) | ${total} (Total) ${warningEmoji} ${warningText}\n`;
 
         // Third line: Token balances if any
-        if (result.balance.balances.tokens?.length > 0) {
-          const tokenBalances = result.balance.balances.tokens
+        if (result.accountState.balances.tokens?.length > 0) {
+          const tokenBalances = result.accountState.balances.tokens
             .map((token) => {
               const tokenAmount = amountToMainUnit(
                 token.amount || "0",
@@ -409,8 +410,8 @@ function generateMarkdownReport(
     const status = result.status === "PASS" ? "✅ PASS" : "❌ FAIL";
     let balanceText = "No balance data";
 
-    if (result.status === "PASS" && result.balance && result.chainInfo) {
-      const nativeBalance = result.balance.balances.native;
+    if (result.status === "PASS" && result.accountState && result.chainInfo) {
+      const nativeBalance = result.accountState.balances.native;
       const decimals = result.chainInfo.decimals;
       const ticker = result.chainInfo.ticker;
       const available = amountToMainUnit(nativeBalance.available, decimals);
@@ -434,8 +435,8 @@ function generateMarkdownReport(
       balanceText += `**${ticker}:** ${available} (Available) | ${total} (Total) ${warningEmoji} ${warningText}\n\n`;
 
       // Third line: Token balances if any
-      if (result.balance.balances.tokens?.length > 0) {
-        const tokenBalances = result.balance.balances.tokens
+      if (result.accountState.balances.tokens?.length > 0) {
+        const tokenBalances = result.accountState.balances.tokens
           .map((token) => {
             const tokenAmount = amountToMainUnit(
               token.amount || "0",

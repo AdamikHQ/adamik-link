@@ -31,7 +31,6 @@ export const encodeTransaction = async ({
     message: "What type of transaction do you want to perform?",
     choices: [
       { title: "Transfer", value: "transfer" },
-      { title: "Transfer Token", value: "transferToken" },
       { title: "Stake", value: "stake" },
       { title: "Unstake", value: "unstake" },
     ],
@@ -58,7 +57,7 @@ export const encodeTransaction = async ({
           const assetChoices = [];
           assetChoices.push({
             title: chain.ticker,
-            value: undefined,
+            value: null,
           });
 
           if (
@@ -77,6 +76,7 @@ export const encodeTransaction = async ({
             name: "tokenId",
             message: `Which asset do you want to transfer?`,
             choices: assetChoices,
+            initial: assetChoices[0].value,
           });
 
           if (tokenId) {
