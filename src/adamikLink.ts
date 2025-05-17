@@ -91,6 +91,7 @@ export const adamikLink = async () => {
   const transactionEncodeResponse = await encodeTransaction({
     chain: chains[chainId],
     senderAddress: address,
+    senderPubKey: pubkey,
     accountState,
   });
 
