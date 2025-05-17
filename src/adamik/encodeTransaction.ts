@@ -1,4 +1,4 @@
-import prompts from "prompts";
+import prompts, { Choice } from "prompts";
 import {
   amountToMainUnit,
   amountToSmallestUnit,
@@ -32,6 +32,7 @@ export const encodeTransaction = async ({
     choices: [
       { title: "Transfer", value: "transfer" },
       { title: "Stake", value: "stake" },
+      { title: "Unstake", value: "unstake", disabled: !accountState.balances.staking || accountState.balances.staking.positions.length === 0 },
     ],
     initial: 0,
   });
@@ -50,57 +51,56 @@ export const encodeTransaction = async ({
   }
 
   switch (verb) {
-    case "transfer":
+    case "transfer": {
       {
-        {
-          const assetChoices = [];
-          assetChoices.push({
-            title: chain.ticker,
-            value: undefined,
-          });
+        const assetChoices = [];
+        assetChoices.push({
+          title: chain.ticker,
+          value: undefined,
+        });
 
-          if (
-            chain.supportedFeatures.write.transaction.type.transferToken ===
-            true
-          ) {
-            accountState.balances.tokens.forEach((t) =>
-              assetChoices.push({
-                value: t.token.id,
-                title: t.token.name,
-              })
-            );
-          }
-          const { tokenId } = await prompts({
-            type: "select",
-            name: "tokenId",
-            message: `Which asset do you want to transfer?`,
-            choices: assetChoices,
-          });
-
-          if (tokenId) {
-            requestBody.transaction.data.tokenId = tokenId;
-            requestBody.transaction.data.mode = "transferToken";
-          } else {
-            requestBody.transaction.data.mode = "transfer";
-          }
+        if (
+          chain.supportedFeatures.write.transaction.type.transferToken ===
+          true
+        ) {
+          accountState.balances.tokens.forEach((t) =>
+            assetChoices.push({
+              value: t.token.id,
+              title: t.token.name,
+            })
+          );
         }
-        {
-          const { recipientAddress } = await prompts({
-            type: "text",
-            name: "recipientAddress",
-            message:
-              "What is the recipient address? (default is signer address)",
-            initial: senderAddress,
-          });
+        const { tokenId } = await prompts({
+          type: "select",
+          name: "tokenId",
+          message: `Which asset do you want to transfer?`,
+          choices: assetChoices,
+        });
 
-          if (!recipientAddress) {
-            throw new Error("No recipient address provided");
-          }
-
-          requestBody.transaction.data.recipientAddress = recipientAddress;
+        if (tokenId) {
+          requestBody.transaction.data.tokenId = tokenId;
+          requestBody.transaction.data.mode = "transferToken";
+        } else {
+          requestBody.transaction.data.mode = "transfer";
         }
       }
+      {
+        const { recipientAddress } = await prompts({
+          type: "text",
+          name: "recipientAddress",
+          message:
+            "What is the recipient address? (default is signer address)",
+          initial: senderAddress,
+        });
+
+        if (!recipientAddress) {
+          throw new Error("No recipient address provided");
+        }
+
+        requestBody.transaction.data.recipientAddress = recipientAddress;
+      }
       break;
+    }
     case "stake":
       {
         requestBody.transaction.data.mode = "stake";
@@ -118,6 +118,25 @@ export const encodeTransaction = async ({
           targetValidatorAddress;
       }
       break;
+    case "unstake": {
+      requestBody.transaction.data.mode = "unstake";
+
+      const choices: Choice[] = accountState.balances.staking!.positions.map((position) => ({
+        title: `${position.validatorAddresses[0].slice(0, 6)}...${position.validatorAddresses[0].slice(-4)} (${amountToMainUnit(position.amount, chain.decimals)} ${chain.ticker})`,
+        value: position,
+      }));
+      const { position } = await prompts<string>({
+        type: "select",
+        name: "position",
+        message: "Which position do you want to unstake?",
+        choices,
+      });
+      if (!position) {
+        throw new Error("No position selected");
+      }
+      requestBody.transaction.data.validatorAddress = position.validatorAddresses[0];
+      break;
+    }
     default:
       throw new Error("Unsupported transaction mode");
   }
