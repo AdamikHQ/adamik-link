@@ -31,15 +31,15 @@ const familyEncodedFormats = [
   {
     family: "cosmos",
     chainId: ["cosmoshub"],
-    signerName: ["TURNKEY"],
+    signerName: ["SODOT"],
     encodedFormats: [
-      // "SIGNDOC_DIRECT", // Direct sign document format
+      "SIGNDOC_DIRECT", // Direct sign document format
       "sha256", // SHA256 hash of the transaction
     ],
   },
   {
     family: "tron",
-    signerName: ["SODOT"],
+    signerName: ["TURNKEY"],
     chainId: ["tron"],
     encodedFormats: [
       "RAW_TRANSACTION", // Raw transaction data
@@ -49,23 +49,23 @@ const familyEncodedFormats = [
       recipientAddress: "TRFc31J1drV7C8CYYjhpJxTxBe1Muf7MGg", // We can't self send in Tron
     },
   },
-  {
-    family: "algorand",
-    chainId: ["algorand"],
-    signerName: ["TURNKEY"],
-    encodedFormats: [
-      "MSGPACK", // MessagePack format for Algorand transactions
-      "sha512_256", // SHA256 hash of the transaction
-    ],
-  },
-  {
-    family: "starknet",
-    chainId: ["starknet"],
-    signerName: ["DFNS"],
-    encodedFormats: [
-      "pedersen", // Pedersen hash format for Starknet transactions
-    ],
-  },
+  // {
+  //   family: "algorand",
+  //   chainId: ["algorand"],
+  //   signerName: ["TURNKEY"],
+  //   encodedFormats: [
+  //     "MSGPACK", // MessagePack format for Algorand transactions
+  //     "sha512_256", // SHA256 hash of the transaction
+  //   ],
+  // },
+  // {
+  //   family: "starknet",
+  //   chainId: ["starknet"],
+  //   signerName: ["DFNS"],
+  //   encodedFormats: [
+  //     "pedersen", // Pedersen hash format for Starknet transactions
+  //   ],
+  // },
 ];
 
 const commonConfig = {
