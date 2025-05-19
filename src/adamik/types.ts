@@ -44,6 +44,7 @@ export type AdamikToken = {
 };
 
 export type StakingPosition = {
+  stakeId?: string;
   validatorAddresses: string[];
   amount: string;
   status: "free" | string; // Add other possible status values if known
