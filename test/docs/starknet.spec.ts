@@ -146,11 +146,15 @@ const transactionBroadcast = async () => {
     }
   }
 
+  const toSign = encodedData.transaction.encoded.find(
+    (encoded: {
+      raw?: { format: string; value: string };
+      hash?: { format: string; value: string };
+    }) => encoded.hash?.format === "pedersen"
+  )?.hash?.value;
+
   // Sign the encoded transaction using StarkNet curve
-  const signature = ec.starkCurve.sign(
-    encodedData.transaction.encoded,
-    walletPrivateKey
-  );
+  const signature = ec.starkCurve.sign(toSign, walletPrivateKey);
   const signatureHex = signature.toDERHex();
 
   console.log("Signature : ", signatureHex);

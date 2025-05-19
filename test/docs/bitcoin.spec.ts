@@ -108,7 +108,12 @@ const transactionBroadcast = async () => {
     "encodedData:",
     "\x1b[32m" + JSON.stringify(encodedData, null, 2) + "\x1b[0m"
   );
-  const rawtx = encodedData.transaction.encoded;
+  const rawtx = encodedData.transaction.encoded.find(
+    (encoded: {
+      raw?: { format: string; value: string };
+      hash?: { format: string; value: string };
+    }) => encoded.raw?.format === "PSBT"
+  )?.raw?.value;
 
   // Create and sign the PSBT (Partially Signed Bitcoin Transaction)
   const psbt = bitcoin.Psbt.fromHex(rawtx);

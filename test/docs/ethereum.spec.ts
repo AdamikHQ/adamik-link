@@ -69,7 +69,6 @@ const transactionBroadcast = async () => {
         amount: amount, // Transaction amount
         useMaxAmount: false,
         memo: "",
-        format: "hex",
         validatorAddress: "",
         params: {
           pubKey: wallet.publicKey, // Public key of the wallet
@@ -96,7 +95,13 @@ const transactionBroadcast = async () => {
   console.log("\x1b[32m" + JSON.stringify(encodedData, null, 2) + "\x1b[0m");
 
   // Sign the encoded transaction
-  const tx = ethers.Transaction.from(encodedData.transaction.encoded);
+  const toSign = encodedData.transaction.encoded.find(
+    (encoded: {
+      raw?: { format: string; value: string };
+      hash?: { format: string; value: string };
+    }) => encoded.raw?.format === "RLP"
+  )?.raw?.value;
+  const tx = ethers.Transaction.from(toSign);
   console.log(tx.toJSON());
   console.log("Signing transaction...");
   const signature = await wallet.signTransaction(tx);

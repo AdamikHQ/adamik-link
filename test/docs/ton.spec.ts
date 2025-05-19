@@ -100,11 +100,16 @@ const transactionBroadcast = async () => {
   console.log("\x1b[32m" + JSON.stringify(encodedData, null, 2) + "\x1b[0m");
 
   // Sign the encoded transaction
-  const tx = encodedData.transaction.encoded;
+  const toSign = encodedData.transaction.encoded.find(
+    (encoded: {
+      raw?: { format: string; value: string };
+      hash?: { format: string; value: string };
+    }) => encoded.hash?.format === "sha256"
+  )?.hash?.value;
   console.log("Signing transaction...");
   // Sign the encoded transaction
   const signature = sign(
-    Buffer.from(encodedData.transaction.encoded, "hex"),
+    Buffer.from(toSign, "hex"),
     keyPair.secretKey
   ).toString("hex");
   console.log(`Signature: ${signature}`);
@@ -115,7 +120,7 @@ const transactionBroadcast = async () => {
   const sendTransactionBody = {
     transaction: {
       data: encodedData.transaction.data,
-      encoded: tx,
+      encoded: encodedData.transaction.encoded,
       signature: signature,
     },
   };
