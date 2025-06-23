@@ -34,7 +34,7 @@ const familyEncodedFormats = [
     signerName: ["SODOT"],
     encodedFormats: [
       "SIGNDOC_DIRECT", // Direct sign document format
-      "sha256", // SHA256 hash of the transaction
+      // "sha256", // SHA256 hash of the transaction
     ],
   },
   {
