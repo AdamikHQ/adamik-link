@@ -11,6 +11,51 @@ const ADAMIK_API_BASE_URL =
   process.env.ADAMIK_API_BASE_URL || "https://api.adamik.io";
 const chainId = "starknet";
 
+// Utility function for fetch with timeout and retries
+const fetchWithRetry = async (
+  url: string,
+  options: RequestInit,
+  retries = 3,
+  timeout = 30000
+): Promise<Response> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        return response;
+      } catch (error) {
+        console.log(`Attempt ${i + 1} failed:`, error.message);
+
+        if (i === retries - 1) {
+          throw error;
+        }
+
+        // Exponential backoff
+        await new Promise((resolve) =>
+          setTimeout(resolve, Math.pow(2, i) * 1000)
+        );
+      }
+    }
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  throw new Error("All retry attempts failed");
+};
+
 const transactionBroadcast = async () => {
   console.log("Creating wallet...");
   const pubKey = ec.starkCurve.getStarkKey(walletPrivateKey);
@@ -20,8 +65,9 @@ const transactionBroadcast = async () => {
     pubkey: pubKey,
   };
 
+  console.log("Fetching wallet address...");
   // Fetch the wallet address from Adamik API
-  const responseAddressEncode = await fetch(
+  const responseAddressEncode = await fetchWithRetry(
     `${ADAMIK_API_BASE_URL}/api/${chainId}/address/encode`,
     {
       method: "POST",
@@ -35,11 +81,19 @@ const transactionBroadcast = async () => {
 
   const addressEncode = await responseAddressEncode.json();
   // Get the ArgentX wallet address
-  const senderAddress = addressEncode.addresses.find(
+  const argentXAddress = addressEncode.addresses.find(
     (address) => address.type === "argentx"
-  ).address;
+  );
 
-  const chainInfo = await fetch(
+  if (!argentXAddress) {
+    throw new Error("ArgentX address not found in response");
+  }
+
+  const senderAddress = argentXAddress.address;
+  console.log("Sender address:", senderAddress);
+
+  console.log("Fetching chain info...");
+  const chainInfo = await fetchWithRetry(
     `${ADAMIK_API_BASE_URL}/api/chains/${chainId}`,
     {
       method: "GET",
@@ -56,7 +110,8 @@ const transactionBroadcast = async () => {
   const ticker = chainInfoData.chain.ticker;
   console.log("Decimals:", decimals);
 
-  const balanceRequest = await fetch(
+  console.log("Fetching account balance...");
+  const balanceRequest = await fetchWithRetry(
     `${ADAMIK_API_BASE_URL}/api/${chainId}/account/${senderAddress}/state`,
     {
       method: "GET",
@@ -91,7 +146,9 @@ const transactionBroadcast = async () => {
       },
     },
   };
-  const response = await fetch(
+
+  console.log("Encoding transaction...");
+  const response = await fetchWithRetry(
     `${ADAMIK_API_BASE_URL}/api/${chainId}/transaction/encode`,
     {
       method: "POST",
@@ -124,7 +181,8 @@ const transactionBroadcast = async () => {
         },
       };
 
-      const responseDeploy = await fetch(
+      console.log("Encoding deploy transaction...");
+      const responseDeploy = await fetchWithRetry(
         `${ADAMIK_API_BASE_URL}/api/${chainId}/transaction/encode`,
         {
           method: "POST",
@@ -146,13 +204,20 @@ const transactionBroadcast = async () => {
     }
   }
 
-  const toSign = encodedData.transaction.encoded.find(
+  const encodedTransaction = encodedData.transaction.encoded.find(
     (encoded: {
       raw?: { format: string; value: string };
       hash?: { format: string; value: string };
     }) => encoded.hash?.format === "pedersen"
-  )?.hash?.value;
+  );
 
+  if (!encodedTransaction?.hash?.value) {
+    throw new Error("No pedersen hash found in encoded transaction");
+  }
+
+  const toSign = encodedTransaction.hash.value;
+
+  console.log("Signing transaction...");
   // Sign the encoded transaction using StarkNet curve
   const signature = ec.starkCurve.sign(toSign, walletPrivateKey);
   const signatureHex = signature.toDERHex();
@@ -167,8 +232,9 @@ const transactionBroadcast = async () => {
     },
   };
 
+  console.log("Broadcasting transaction...");
   // Broadcast the signed transaction
-  const broadcastResponse = await fetch(
+  const broadcastResponse = await fetchWithRetry(
     `${ADAMIK_API_BASE_URL}/api/${chainId}/transaction/broadcast`,
     {
       method: "POST",
@@ -177,7 +243,9 @@ const transactionBroadcast = async () => {
         Authorization: ADAMIK_API_KEY,
       },
       body: JSON.stringify(broadcastTransactionBody),
-    }
+    },
+    3,
+    60000 // Longer timeout for broadcast
   );
 
   const responseData = await broadcastResponse.json();
@@ -190,8 +258,41 @@ const transactionBroadcast = async () => {
 };
 
 describe("Starknet with Adamik", () => {
-  it("should encode a transaction and broadcast it", async () => {
-    const responseData = await transactionBroadcast();
-    expect(responseData.hash).to.exist;
+  it("should encode a transaction and broadcast it", async function () {
+    // Increase timeout for CI environments
+    this.timeout(120000); // 2 minutes
+
+    // Skip test if required environment variables are not set
+    if (!walletPrivateKey || walletPrivateKey === "") {
+      console.log("Skipping test: STARKNET_PRIVATE_KEY not set");
+      this.skip();
+    }
+
+    if (!ADAMIK_API_KEY || ADAMIK_API_KEY === "your-adamik-api-key") {
+      console.log("Skipping test: ADAMIK_API_KEY not set");
+      this.skip();
+    }
+
+    try {
+      const responseData = await transactionBroadcast();
+      expect(responseData.hash).to.exist;
+    } catch (error) {
+      console.error("Test failed with error:", error);
+
+      // Provide more context for debugging
+      if (error.message.includes("timeout")) {
+        throw new Error(
+          `Network timeout - this may be due to slow CI network conditions: ${error.message}`
+        );
+      }
+
+      if (error.message.includes("HTTP")) {
+        throw new Error(
+          `API error - check network connectivity and API status: ${error.message}`
+        );
+      }
+
+      throw error;
+    }
   });
 });
