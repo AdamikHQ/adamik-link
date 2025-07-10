@@ -44,22 +44,41 @@ export const adamikLink = async () => {
 
   infoTerminal("========================================");
 
-  infoTerminal(`Getting pubkey ...`, signer.signerName);
-  const pubkey = await signer.getPubkey();
-  infoTerminal(`Pubkey:`, signer.signerName);
-  await italicInfoTerminal(JSON.stringify(pubkey, null, 2));
+  let address: string;
+  let pubkey: string | undefined = undefined;
 
-  if (!pubkey) {
-    errorTerminal("Failed to get pubkey from signer", signer.signerName);
-    return;
+  try {
+    infoTerminal(`Getting pubkey from signer...`, signer.signerName);
+    pubkey = await signer.getPubkey();
+    infoTerminal(`Pubkey:`, signer.signerName);
+    await italicInfoTerminal(JSON.stringify(pubkey, null, 2));
+
+    if (!pubkey) {
+      throw new Error("Failed to get pubkey from signer");
+    }
+
+    infoTerminal("========================================");
+
+    infoTerminal(`Encoding pubkey to address ...`, "Adamik");
+    address = await encodePubKeyToAddress(pubkey, chainId);
+    infoTerminal(`Address:`, "Adamik");
+    await italicInfoTerminal(address);
+  } catch (error) {
+    infoTerminal(`Failed to get pubkey from signer`, signer.signerName);
+    infoTerminal(`Getting address from signer...`, signer.signerName);
+
+    try {
+      address = await signer.getAddress();
+      infoTerminal(`Address:`, signer.signerName);
+      await italicInfoTerminal(address);
+    } catch (signerError) {
+      errorTerminal(
+        `Failed to get address from signer: ${signerError}`,
+        signer.signerName
+      );
+      return;
+    }
   }
-
-  infoTerminal("========================================");
-
-  infoTerminal(`Encoding pubkey to address ...`, "Adamik");
-  const address = await encodePubKeyToAddress(pubkey, chainId);
-  infoTerminal(`Address:`, "Adamik");
-  await italicInfoTerminal(address);
 
   infoTerminal("========================================");
 

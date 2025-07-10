@@ -66,6 +66,10 @@ export class TurnkeySigner implements BaseSigner {
     }
   }
 
+  async getAddress(): Promise<string> {
+    throw new Error("Not implemented");
+  }
+
   async getPubkey(): Promise<string> {
     console.log("TURNKEY WALLET ID", process.env.TURNKEY_WALLET_ID);
     const { accounts } = await this.turnkeyClient

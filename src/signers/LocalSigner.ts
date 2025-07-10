@@ -110,6 +110,10 @@ export class LocalSigner implements BaseSigner {
     return this.starkPrivateKey;
   }
 
+  async getAddress(): Promise<string> {
+    throw new Error("Not implemented");
+  }
+
   async getPubkey(): Promise<string> {
     switch (this.signerSpec.curve) {
       case AdamikCurve.SECP256K1: {

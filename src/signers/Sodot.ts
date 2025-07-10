@@ -78,6 +78,10 @@ export class SodotSigner implements BaseSigner {
     return true;
   }
 
+  async getAddress(): Promise<string> {
+    throw new Error("Not implemented");
+  }
+
   public async getPubkey(): Promise<string> {
     // If we no keyids is provided, we generate a new keypair.
     if (this.keyIds.length === 0) {
