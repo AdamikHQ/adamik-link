@@ -3,9 +3,51 @@ import {
   AdamikHashFunction,
   AdamikSignerSpec,
 } from "../adamik/types";
-import { extractSignature, infoTerminal, italicInfoTerminal } from "../utils";
+import { infoTerminal, italicInfoTerminal } from "../utils";
 import { Signer } from "./index";
 import { BaseSigner } from "./types";
+
+export interface IoFinnetSignatureResponse {
+  id: string;
+  signatureId: string;
+  status: string;
+  memo: string;
+  errorCode: string | null;
+  errorMessage: string | null;
+  voting: {
+    approvedWeight: number;
+    progress: string;
+    threshold: number;
+    votes: {
+      required: boolean;
+      vote: string | null;
+      weight: number;
+      device: {
+        id: string;
+        name: string;
+        type: string;
+        user: {
+          id: string;
+          profile: {
+            fullName: string;
+          };
+        };
+      };
+    }[];
+  };
+  signingData: {
+    signature: string | null;
+    data: string;
+    contentType: string;
+    coseAlgorithm: {
+      type: string;
+      value: string;
+    };
+  };
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string;
+}
 
 export class IoFinnetSigner implements BaseSigner {
   public chainId: string;
@@ -75,30 +117,72 @@ export class IoFinnetSigner implements BaseSigner {
     return this.accessToken!;
   }
 
-  private convertAdamikCurveToIoFinnetCurve(curve: AdamikCurve): string {
-    // TODO: Map Adamik curves to IoFinnet curve types
-    switch (curve) {
-      case AdamikCurve.SECP256K1:
-        return "secp256k1";
-      case AdamikCurve.ED25519:
-        return "ed25519";
-      default:
-        throw new Error(`Unsupported curve: ${curve}`);
-    }
-  }
+  private async pollForSignatureCompletion(
+    signatureId: string,
+    token: string
+  ): Promise<string> {
+    const maxAttempts = 60; // 10 minutes max (60 * 10s)
+    let attempts = 0;
 
-  private convertHashFunctionToIoFinnetHashFunction(
-    hashFunction: AdamikHashFunction
-  ): string {
-    // TODO: Map Adamik hash functions to IoFinnet hash function types
-    switch (hashFunction) {
-      case AdamikHashFunction.SHA256:
-        return "sha256";
-      case AdamikHashFunction.KECCAK256:
-        return "keccak256";
-      default:
-        throw new Error(`Unsupported hash function: ${hashFunction}`);
+    while (attempts < maxAttempts) {
+      try {
+        const response = await fetch(
+          `${this.baseUrl}/v1/vaults/${this.vaultId}/signatures/${signatureId}`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            `Failed to get signature status: ${response.statusText}`
+          );
+        }
+
+        const signatureData: IoFinnetSignatureResponse = await response.json();
+
+        infoTerminal(
+          `Signature status: ${signatureData.status}`,
+          this.signerName
+        );
+
+        if (signatureData.status === "COMPLETED") {
+          if (!signatureData.signingData.signature) {
+            throw new Error("Signature completed but no signature data found");
+          }
+          return signatureData.signingData.signature;
+        }
+
+        if (
+          signatureData.status === "FAILED" ||
+          signatureData.status === "CANCELLED"
+        ) {
+          throw new Error(
+            `Signature ${signatureData.status.toLowerCase()}: ${
+              signatureData.errorMessage || "Unknown error"
+            }`
+          );
+        }
+
+        // Wait 10 seconds before next poll
+        await new Promise((resolve) => setTimeout(resolve, 10000));
+        attempts++;
+      } catch (error) {
+        if (error instanceof Error && error.message.includes("Signature")) {
+          throw error; // Re-throw signature-specific errors
+        }
+        throw new Error(`Failed to poll signature status: ${error}`);
+      }
     }
+
+    throw new Error(
+      "Signature completion timeout - exceeded maximum polling time"
+    );
   }
 
   private convertChainIdToIoFinnetAssetId(chainId: string): string {
@@ -109,12 +193,45 @@ export class IoFinnetSigner implements BaseSigner {
         return "BTC_TESTNET";
       case "ethereum":
         return "ETH";
+      case "sepolia":
+        return "ETH_SEPOLIA";
       case "bsc":
         return "BSC";
       case "polygon":
         return "POLYGON";
+      case "tron":
+        return "TRON";
       default:
         throw new Error(`Unsupported chainId: ${chainId}`);
+    }
+  }
+
+  private getIoFinnetCoseAlgorithm(
+    curve: AdamikCurve,
+    hashFunction: AdamikHashFunction
+  ): string {
+    // Map Adamik curves and hash functions to IoFinnet COSE algorithms
+    switch (curve) {
+      case AdamikCurve.SECP256K1:
+        switch (hashFunction) {
+          case AdamikHashFunction.SHA256:
+            return "ES256K"; // ECDSA with secp256k1 and SHA-256
+          case AdamikHashFunction.KECCAK256:
+            return "ESKEC256"; // ECDSA with secp256k1 and Keccak-256
+          default:
+            throw new Error(
+              `Unsupported hash function ${hashFunction} for SECP256K1 curve`
+            );
+        }
+      case AdamikCurve.ED25519:
+        // Ed25519 typically doesn't use external hash functions
+        return "EDDSA"; // EdDSA with Ed25519
+      case AdamikCurve.STARK:
+        throw new Error(
+          "STARK curves are not supported by IoFinnet COSE algorithms"
+        );
+      default:
+        throw new Error(`Unsupported curve: ${curve}`);
     }
   }
 
@@ -173,20 +290,24 @@ export class IoFinnetSigner implements BaseSigner {
     const token = await this.ensureAuthenticated();
 
     try {
-      // TODO: Implement transaction signing via IoFinnet API
-      // POST /v1/vaults/{vaultId}/signatures/sign
       infoTerminal("Signing transaction with IoFinnet...", this.signerName);
       await italicInfoTerminal(`Encoded message: ${encodedMessage}`);
 
-      // FIXME
+      // Remove "0x" prefix if present
+      const cleanEncodedMessage = encodedMessage.startsWith("0x")
+        ? encodedMessage.slice(2)
+        : encodedMessage;
+
       const signatureRequest = {
-        // TODO: Structure the request according to IoFinnet API specification
-        message: encodedMessage,
-        message_format: "hex", // or "raw" depending on API
-        curve: this.convertAdamikCurveToIoFinnetCurve(this.signerSpec.curve),
-        hash_function: this.convertHashFunctionToIoFinnetHashFunction(
+        data: cleanEncodedMessage,
+        coseAlgorithm: this.getIoFinnetCoseAlgorithm(
+          this.signerSpec.curve,
           this.signerSpec.hashFunction
         ),
+        contentType: "application/octet-stream+hex",
+        //source: "?",
+        //memo: "",
+        //expiresAt: "",
       };
 
       const response = await fetch(
@@ -203,66 +324,40 @@ export class IoFinnetSigner implements BaseSigner {
       );
 
       if (!response.ok) {
-        throw new Error(`Transaction signing failed: ${response.statusText}`);
+        throw new Error(
+          `Transaction signature request failed: ${response.statusText}`
+        );
       }
 
-      const signatureData = await response.json();
+      const signatureRequestData: IoFinnetSignatureResponse =
+        await response.json();
+
+      infoTerminal("Signature request created successfully", this.signerName);
+      await italicInfoTerminal(JSON.stringify(signatureRequestData, null, 2));
+
+      // Extract signature ID for polling
+      const signatureId = signatureRequestData.signatureId;
+      infoTerminal(`Signature ID: ${signatureId}`, this.signerName);
+      infoTerminal(
+        "Waiting for signature approval and completion...",
+        this.signerName
+      );
+
+      // Poll for signature completion
+      const completedSignature = await this.pollForSignatureCompletion(
+        signatureId,
+        token
+      );
 
       infoTerminal("Transaction signed successfully", this.signerName);
-      await italicInfoTerminal(JSON.stringify(signatureData, null, 2));
-
-      // TODO: Extract and format signature according to Adamik signature format
-      // FIXME Does signatureData have the right format?
-      return extractSignature(this.signerSpec.signatureFormat, signatureData);
+      return completedSignature;
     } catch (error) {
       throw new Error(`Failed to sign transaction with IoFinnet: ${error}`);
     }
   }
 
-  // FIXME Not sure we can implement this one
   public async signHash(hash: string): Promise<string> {
-    const token = await this.ensureAuthenticated();
-
-    try {
-      // TODO: Implement hash signing via IoFinnet API
-      // POST /v1/vaults/{vaultId}/signatures/sign
-      infoTerminal("Signing hash with IoFinnet...", this.signerName);
-      await italicInfoTerminal(`Hash: ${hash}`);
-
-      const signatureRequest = {
-        // TODO: Structure the request according to IoFinnet API specification
-        hash: hash,
-        message_format: "hash",
-        curve: this.convertAdamikCurveToIoFinnetCurve(this.signerSpec.curve),
-        // For hash signing, we might not need to specify hash function
-      };
-
-      const response = await fetch(
-        `${this.baseUrl}/v1/vaults/${this.vaultId}/signatures/sign`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify(signatureRequest),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Hash signing failed: ${response.statusText}`);
-      }
-
-      const signatureData = await response.json();
-
-      infoTerminal("Hash signed successfully", this.signerName);
-      await italicInfoTerminal(JSON.stringify(signatureData, null, 2));
-
-      // TODO: Extract and format signature according to Adamik signature format
-      return extractSignature(this.signerSpec.signatureFormat, signatureData);
-    } catch (error) {
-      throw new Error(`Failed to sign hash with IoFinnet: ${error}`);
-    }
+    // NOTE io.finnet always apply the hash themselves
+    throw new Error("Not implemented");
   }
 }
