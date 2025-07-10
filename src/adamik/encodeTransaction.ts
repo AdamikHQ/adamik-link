@@ -99,11 +99,20 @@ export const encodeTransaction = async ({
         }
       }
       {
+        // Enforce default recipient address for TRX transfers
+        const defaultRecipient =
+          chain.id === "tron"
+            ? "TVKG4gUar24bpAVrDv4GSzyDRtPkjPkogL"
+            : senderAddress;
+
         const { recipientAddress } = await overridedPrompt({
           type: "text",
           name: "recipientAddress",
-          message: "What is the recipient address? (default is signer address)",
-          initial: senderAddress,
+          message:
+            chain.id === "tron"
+              ? "Recipient address (default: TVKG4gUar24bpAVrDv4GSzyDRtPkjPkogL)"
+              : "What is the recipient address? (default is signer address)",
+          initial: defaultRecipient,
         });
 
         if (!recipientAddress) {
