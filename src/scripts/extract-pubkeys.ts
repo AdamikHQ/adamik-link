@@ -168,6 +168,39 @@ function extractPubkeyFromRedeemScript(input: any): string | null {
   return null;
 }
 
+function extractActualPubkeys(input: any): string[] {
+  const pubkeys: string[] = [];
+
+  // Check bip32Derivation for actual public keys
+  if (input.bip32Derivation && Array.isArray(input.bip32Derivation)) {
+    input.bip32Derivation.forEach((derivation: any) => {
+      if (derivation.pubkey) {
+        const pubkeyHex = derivation.pubkey.toString("hex");
+        pubkeys.push(`BIP32: ${pubkeyHex}`);
+      }
+    });
+  }
+
+  // Check partialSig for public keys (they're used as keys in the map)
+  if (input.partialSig && typeof input.partialSig === "object") {
+    Object.keys(input.partialSig).forEach((pubkeyHex) => {
+      pubkeys.push(`PartialSig: ${pubkeyHex}`);
+    });
+  }
+
+  // Check tapBip32Derivation for Taproot
+  if (input.tapBip32Derivation && Array.isArray(input.tapBip32Derivation)) {
+    input.tapBip32Derivation.forEach((derivation: any) => {
+      if (derivation.pubkey) {
+        const pubkeyHex = derivation.pubkey.toString("hex");
+        pubkeys.push(`TapBIP32: ${pubkeyHex}`);
+      }
+    });
+  }
+
+  return pubkeys;
+}
+
 // ---------------------------------------------------
 // Main Function
 // ---------------------------------------------------
@@ -225,10 +258,18 @@ psbt.data.inputs.forEach((input, index) => {
   // Try to get more detailed pubkey info from redeem/witness scripts
   const additionalPubkey = extractPubkeyFromRedeemScript(input);
 
+  // Extract actual public keys from BIP32 derivation, partial sigs, etc.
+  const actualPubkeys = extractActualPubkeys(input);
+
+  let finalPubkey = additionalPubkey || analysis.pubkey || "Unable to extract";
+  if (actualPubkeys.length > 0) {
+    finalPubkey = actualPubkeys.join(", ");
+  }
+
   results.push({
     index,
     addressType: analysis.addressType || "Unknown",
-    pubkey: additionalPubkey || analysis.pubkey || "Unable to extract",
+    pubkey: finalPubkey,
     address: analysis.address || "Unable to determine",
     amount: amount,
     scriptHex: scriptHex,
@@ -269,6 +310,49 @@ console.log("\n📋 Raw Script Details:");
 results.forEach((result, i) => {
   if (result.scriptHex !== "N/A") {
     console.log(`\nInput ${i}: ${result.scriptHex}`);
+  }
+});
+
+console.log("\n🔍 Detailed PSBT Fields (for pubkey hunting):");
+psbt.data.inputs.forEach((input, index) => {
+  console.log(`\nInput ${index}:`);
+
+  // List all available fields
+  const fields = Object.keys(input);
+  console.log(`  Available fields: ${fields.join(", ")}`);
+
+  // Show BIP32 derivation if present
+  if (input.bip32Derivation) {
+    console.log(
+      `  bip32Derivation: ${JSON.stringify(input.bip32Derivation, null, 2)}`
+    );
+  }
+
+  // Show partial signatures if present
+  if (input.partialSig) {
+    console.log(
+      `  partialSig keys (pubkeys): ${Object.keys(input.partialSig).join(", ")}`
+    );
+  }
+
+  // Show other potentially interesting fields
+  if (input.redeemScript) {
+    console.log(`  redeemScript: ${input.redeemScript.toString("hex")}`);
+  }
+  if (input.witnessScript) {
+    console.log(`  witnessScript: ${input.witnessScript.toString("hex")}`);
+  }
+  if (input.sighashType) {
+    console.log(`  sighashType: ${input.sighashType}`);
+  }
+  if (input.tapBip32Derivation) {
+    console.log(
+      `  tapBip32Derivation: ${JSON.stringify(
+        input.tapBip32Derivation,
+        null,
+        2
+      )}`
+    );
   }
 });
 
