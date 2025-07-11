@@ -16,6 +16,7 @@
     "@noble/curves": "^1.8.1",
     "@noble/ed25519": "^2.2.3",
     "@turnkey/sdk-server": "^2.2.0",
+    "@types/secp256k1": "^4.0.6",
     "cli-table3": "^0.6.5",
     "date-fns": "^4.1.0",
     "dotenv": "^16.4.7",
@@ -24,6 +25,7 @@
     "noble-ed25519": "^1.2.6",
     "picocolors": "^1.1.1",
     "prompts": "^2.4.2",
+    "secp256k1": "^5.0.1",
     "tonweb": "^0.0.66",
     "tonweb-mnemonic": "^1.0.1",
     "tweetnacl": "^1.0.3"

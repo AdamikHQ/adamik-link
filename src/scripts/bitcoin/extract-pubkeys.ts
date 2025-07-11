@@ -1,13 +1,13 @@
 #!/usr/bin/env tsx
 
 /**
- * CLI Tool: Extract public keys from all Bitcoin address types in a PSBT
+ * CLI Tool: Extract public keys and addresses from Bitcoin PSBTs
  *
  * Usage:
- *   npx tsx src/scripts/extract-pubkeys.ts <hex_psbt>
+ *   npx tsx src/scripts/bitcoin/extract-pubkeys.ts <hex_psbt>
  *
  * Example:
- *   npx tsx src/scripts/extract-pubkeys.ts 70736274ff0100...
+ *   npx tsx src/scripts/bitcoin/extract-pubkeys.ts 70736274ff0100...
  */
 
 import * as bitcoin from "bitcoinjs-lib";
@@ -15,8 +15,8 @@ import * as bitcoin from "bitcoinjs-lib";
 interface InputAnalysis {
   index: number;
   addressType: string;
-  pubkey: string | null;
-  address: string | null;
+  pubkeyInfo: string;
+  address: string;
   amount: number | null;
   scriptHex: string;
 }
@@ -25,13 +25,8 @@ interface InputAnalysis {
 // Helper Functions
 // ---------------------------------------------------
 
-function analyzeScriptPubKey(
-  scriptHex: string,
-  witnessUtxo?: any
-): Partial<InputAnalysis> {
+function analyzeScriptPubKey(scriptHex: string): Partial<InputAnalysis> {
   try {
-    const script = Buffer.from(scriptHex, "hex");
-
     // P2TR (Taproot) - OP_1 <32-byte>
     if (scriptHex.startsWith("5120") && scriptHex.length === 68) {
       const xOnlyPubkey = scriptHex.slice(4);
@@ -42,7 +37,7 @@ function analyzeScriptPubKey(
       );
       return {
         addressType: "P2TR (Taproot)",
-        pubkey: xOnlyPubkey,
+        pubkeyInfo: `X-Only: ${xOnlyPubkey}`,
         address: address,
       };
     }
@@ -57,7 +52,7 @@ function analyzeScriptPubKey(
       );
       return {
         addressType: "P2WPKH (Native SegWit)",
-        pubkey: `Hash: ${pubkeyHash}`,
+        pubkeyInfo: `PubkeyHash: ${pubkeyHash}`,
         address: address,
       };
     }
@@ -71,8 +66,8 @@ function analyzeScriptPubKey(
         "bc"
       );
       return {
-        addressType: "P2WSH (Native SegWit Script)",
-        pubkey: `Script Hash: ${scriptHash}`,
+        addressType: "P2WSH (Native SegWit)",
+        pubkeyInfo: `ScriptHash: ${scriptHash}`,
         address: address,
       };
     }
@@ -90,7 +85,7 @@ function analyzeScriptPubKey(
       );
       return {
         addressType: "P2SH (SegWit wrapped)",
-        pubkey: `Script Hash: ${scriptHash}`,
+        pubkeyInfo: `ScriptHash: ${scriptHash}`,
         address: address,
       };
     }
@@ -108,7 +103,7 @@ function analyzeScriptPubKey(
       );
       return {
         addressType: "P2PKH (Legacy)",
-        pubkey: `Hash: ${pubkeyHash}`,
+        pubkeyInfo: `PubkeyHash: ${pubkeyHash}`,
         address: address,
       };
     }
@@ -117,7 +112,6 @@ function analyzeScriptPubKey(
     if (scriptHex.endsWith("ac")) {
       const pubkeyCandidate = scriptHex.slice(0, -2);
       if (pubkeyCandidate.length === 66 || pubkeyCandidate.length === 130) {
-        // Remove length prefix if present
         const pubkey = pubkeyCandidate.startsWith("21")
           ? pubkeyCandidate.slice(2)
           : pubkeyCandidate.startsWith("41")
@@ -127,7 +121,7 @@ function analyzeScriptPubKey(
         if (pubkey.length === 66 || pubkey.length === 130) {
           return {
             addressType: "P2PK (Pay to Public Key)",
-            pubkey: pubkey,
+            pubkeyInfo: `Pubkey: ${pubkey}`,
             address: "N/A (Direct pubkey)",
           };
         }
@@ -136,36 +130,16 @@ function analyzeScriptPubKey(
 
     return {
       addressType: "Unknown/Custom",
-      pubkey: "Unable to extract",
+      pubkeyInfo: "Unable to extract",
       address: "Unable to determine",
     };
   } catch (err) {
     return {
       addressType: "Parse Error",
-      pubkey: `Error: ${err instanceof Error ? err.message : String(err)}`,
+      pubkeyInfo: `Error: ${err instanceof Error ? err.message : String(err)}`,
       address: "N/A",
     };
   }
-}
-
-function extractPubkeyFromRedeemScript(input: any): string | null {
-  // Try to extract pubkey from redeemScript or witnessScript
-  if (input.redeemScript) {
-    const redeemHex = input.redeemScript.toString("hex");
-    // Look for pubkey patterns in redeem script
-    if (redeemHex.startsWith("0014")) {
-      // P2WPKH wrapped in P2SH
-      return `WPKH Hash: ${redeemHex.slice(4)}`;
-    }
-  }
-
-  if (input.witnessScript) {
-    const witnessHex = input.witnessScript.toString("hex");
-    // Analyze witness script for pubkeys
-    return `Witness Script: ${witnessHex}`;
-  }
-
-  return null;
 }
 
 function extractActualPubkeys(input: any): string[] {
@@ -181,7 +155,7 @@ function extractActualPubkeys(input: any): string[] {
     });
   }
 
-  // Check partialSig for public keys (they're used as keys in the map)
+  // Check partialSig for public keys
   if (input.partialSig && typeof input.partialSig === "object") {
     Object.keys(input.partialSig).forEach((pubkeyHex) => {
       pubkeys.push(`PartialSig: ${pubkeyHex}`);
@@ -206,7 +180,9 @@ function extractActualPubkeys(input: any): string[] {
 // ---------------------------------------------------
 if (process.argv.length < 3) {
   console.error("❌ ERROR: Missing argument.");
-  console.error("Usage: npx tsx src/scripts/extract-pubkeys.ts <hex_psbt>");
+  console.error(
+    "Usage: npx tsx src/scripts/bitcoin/extract-pubkeys.ts <hex_psbt>"
+  );
   process.exit(1);
 }
 
@@ -229,7 +205,8 @@ try {
   process.exit(1);
 }
 
-console.log("✅ PSBT parsed successfully.\n");
+console.log("🔐 Bitcoin PSBT Analysis\n");
+console.log("✅ PSBT parsed successfully\n");
 
 // ---------------------------------------------------
 // Analyze all inputs
@@ -241,7 +218,7 @@ psbt.data.inputs.forEach((input, index) => {
     results.push({
       index,
       addressType: "No UTXO data",
-      pubkey: "N/A",
+      pubkeyInfo: "N/A",
       address: "N/A",
       amount: null,
       scriptHex: "N/A",
@@ -253,23 +230,20 @@ psbt.data.inputs.forEach((input, index) => {
   const scriptHex = scriptPubKey.toString("hex");
   const amount = input.witnessUtxo.value;
 
-  const analysis = analyzeScriptPubKey(scriptHex, input.witnessUtxo);
-
-  // Try to get more detailed pubkey info from redeem/witness scripts
-  const additionalPubkey = extractPubkeyFromRedeemScript(input);
+  const analysis = analyzeScriptPubKey(scriptHex);
 
   // Extract actual public keys from BIP32 derivation, partial sigs, etc.
   const actualPubkeys = extractActualPubkeys(input);
 
-  let finalPubkey = additionalPubkey || analysis.pubkey || "Unable to extract";
+  let finalPubkeyInfo = analysis.pubkeyInfo || "Unable to extract";
   if (actualPubkeys.length > 0) {
-    finalPubkey = actualPubkeys.join(", ");
+    finalPubkeyInfo = actualPubkeys.join(", ");
   }
 
   results.push({
     index,
     addressType: analysis.addressType || "Unknown",
-    pubkey: finalPubkey,
+    pubkeyInfo: finalPubkeyInfo,
     address: analysis.address || "Unable to determine",
     amount: amount,
     scriptHex: scriptHex,
@@ -277,83 +251,54 @@ psbt.data.inputs.forEach((input, index) => {
 });
 
 // ---------------------------------------------------
-// Display Results in Table
+// Display Results
 // ---------------------------------------------------
-console.log("📊 PSBT Input Analysis Results\n");
-console.log(
-  "┌─────┬──────────────────────────┬────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────────────────────┬──────────────┐"
-);
-console.log(
-  "│ #   │ Address Type             │ Public Key / Hash                                                      │ Address                                                              │ Amount (BTC) │"
-);
-console.log(
-  "├─────┼──────────────────────────┼────────────────────────────────────────────────────────────────────┼──────────────────────────────────────────────────────────────────┼──────────────┤"
-);
+console.log("📊 PSBT Input Analysis\n");
 
 results.forEach((result) => {
-  const index = result.index.toString().padEnd(3);
-  const type = result.addressType?.slice(0, 24).padEnd(24) || "N/A".padEnd(24);
-  const pubkey = (result.pubkey?.slice(0, 70) || "N/A").padEnd(70);
-  const address = (result.address?.slice(0, 68) || "N/A").padEnd(68);
-  const amount = result.amount
-    ? (result.amount / 100000000).toFixed(8).padStart(12)
-    : "N/A".padStart(12);
+  const amountBTC = result.amount
+    ? (result.amount / 100000000).toFixed(8)
+    : "N/A";
 
-  console.log(`│ ${index} │ ${type} │ ${pubkey} │ ${address} │ ${amount} │`);
+  console.log(`Input ${result.index}:`);
+  console.log(`  Type: ${result.addressType}`);
+  console.log(`  Address: ${result.address}`);
+  console.log(`  Amount: ${amountBTC} BTC`);
+  console.log(`  Pubkey Info: ${result.pubkeyInfo}`);
+  console.log(`  Script: ${result.scriptHex}`);
+  console.log("");
 });
 
-console.log(
-  "└─────┴──────────────────────────┴────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────────────────────┴──────────────┘"
-);
+// Show additional PSBT details if present
+console.log("🔍 Additional PSBT Information:\n");
 
-console.log("\n📋 Raw Script Details:");
-results.forEach((result, i) => {
-  if (result.scriptHex !== "N/A") {
-    console.log(`\nInput ${i}: ${result.scriptHex}`);
-  }
-});
+let hasAdditionalInfo = false;
 
-console.log("\n🔍 Detailed PSBT Fields (for pubkey hunting):");
 psbt.data.inputs.forEach((input, index) => {
-  console.log(`\nInput ${index}:`);
+  const details: string[] = [];
 
-  // List all available fields
-  const fields = Object.keys(input);
-  console.log(`  Available fields: ${fields.join(", ")}`);
-
-  // Show BIP32 derivation if present
-  if (input.bip32Derivation) {
-    console.log(
-      `  bip32Derivation: ${JSON.stringify(input.bip32Derivation, null, 2)}`
-    );
-  }
-
-  // Show partial signatures if present
-  if (input.partialSig) {
-    console.log(
-      `  partialSig keys (pubkeys): ${Object.keys(input.partialSig).join(", ")}`
-    );
-  }
-
-  // Show other potentially interesting fields
   if (input.redeemScript) {
-    console.log(`  redeemScript: ${input.redeemScript.toString("hex")}`);
+    details.push(`RedeemScript: ${input.redeemScript.toString("hex")}`);
   }
+
   if (input.witnessScript) {
-    console.log(`  witnessScript: ${input.witnessScript.toString("hex")}`);
+    details.push(`WitnessScript: ${input.witnessScript.toString("hex")}`);
   }
+
   if (input.sighashType) {
-    console.log(`  sighashType: ${input.sighashType}`);
+    details.push(`SighashType: ${input.sighashType}`);
   }
-  if (input.tapBip32Derivation) {
-    console.log(
-      `  tapBip32Derivation: ${JSON.stringify(
-        input.tapBip32Derivation,
-        null,
-        2
-      )}`
-    );
+
+  if (details.length > 0) {
+    hasAdditionalInfo = true;
+    console.log(`Input ${index} Additional Fields:`);
+    details.forEach((detail) => console.log(`  ${detail}`));
+    console.log("");
   }
 });
 
-console.log("\n✅ Analysis complete!");
+if (!hasAdditionalInfo) {
+  console.log("No additional fields found in PSBT inputs.");
+}
+
+console.log("✅ Analysis complete!");
