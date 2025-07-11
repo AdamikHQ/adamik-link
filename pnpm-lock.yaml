@@ -92,6 +92,9 @@ importers:
       '@types/prompts':
         specifier: ^2.4.7
         version: 2.4.9
+      bip174:
+        specifier: 2.1.1
+        version: 2.1.1
       bip32:
         specifier: ^5.0.0-rc.0
         version: 5.0.0-rc.0(typescript@5.7.3)

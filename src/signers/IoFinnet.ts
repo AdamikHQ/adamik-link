@@ -5,7 +5,13 @@ import {
 } from "../adamik/types";
 import { infoTerminal, italicInfoTerminal } from "../utils";
 import { Signer } from "./index";
+import {
+  finalizeBitcoinPsbt,
+  getHashForSig,
+  HARDCODED_IOFINNET_BITCOIN_PUBKEY,
+} from "./IoFinnet-bitcoin";
 import { BaseSigner } from "./types";
+import { Psbt, Transaction } from "bitcoinjs-lib";
 
 export interface IoFinnetSignatureResponse {
   id: string;
@@ -83,108 +89,6 @@ export class IoFinnetSigner implements BaseSigner {
     return true;
   }
 
-  private async authenticate(): Promise<string> {
-    try {
-      const response = await fetch(`${this.baseUrl}/v1/auth/accessToken`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          clientId: process.env.IOFINNET_CLIENT_ID,
-          clientSecret: process.env.IOFINNET_CLIENT_SECRET,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Authentication failed: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      this.accessToken = data.accessToken;
-
-      return this.accessToken!;
-    } catch (error) {
-      throw new Error(`Failed to authenticate with IoFinnet: ${error}`);
-    }
-  }
-
-  private async ensureAuthenticated(): Promise<string> {
-    if (!this.accessToken) {
-      return await this.authenticate();
-    }
-    return this.accessToken!;
-  }
-
-  private async pollForSignatureCompletion(
-    signatureId: string,
-    token: string
-  ): Promise<string> {
-    const maxAttempts = 60; // 10 minutes max (60 * 10s)
-    let attempts = 0;
-
-    while (attempts < maxAttempts) {
-      try {
-        const response = await fetch(
-          `${this.baseUrl}/v1/vaults/${this.vaultId}/signatures/${signatureId}`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error(
-            `Failed to get signature status: ${response.statusText}`
-          );
-        }
-
-        const signatureData: IoFinnetSignatureResponse = await response.json();
-
-        infoTerminal(
-          `Signature status: ${signatureData.status}`,
-          this.signerName
-        );
-
-        if (signatureData.status === "COMPLETED") {
-          if (!signatureData.signingData.signature) {
-            throw new Error("Signature completed but no signature data found");
-          }
-          return signatureData.signingData.signature;
-        }
-
-        if (
-          signatureData.status === "FAILED" ||
-          signatureData.status === "CANCELLED"
-        ) {
-          throw new Error(
-            `Signature ${signatureData.status.toLowerCase()}: ${
-              signatureData.errorMessage || "Unknown error"
-            }`
-          );
-        }
-
-        // Wait 10 seconds before next poll
-        await new Promise((resolve) => setTimeout(resolve, 10000));
-        attempts++;
-      } catch (error) {
-        if (error instanceof Error && error.message.includes("Signature")) {
-          throw error; // Re-throw signature-specific errors
-        }
-        throw new Error(`Failed to poll signature status: ${error}`);
-      }
-    }
-
-    throw new Error(
-      "Signature completion timeout - exceeded maximum polling time"
-    );
-  }
-
   private convertChainIdToIoFinnetAssetId(chainId: string): string {
     switch (chainId) {
       case "bitcoin":
@@ -233,6 +137,68 @@ export class IoFinnetSigner implements BaseSigner {
       default:
         throw new Error(`Unsupported curve: ${curve}`);
     }
+  }
+
+  private async authenticate(): Promise<string> {
+    try {
+      const response = await fetch(`${this.baseUrl}/v1/auth/accessToken`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          clientId: process.env.IOFINNET_CLIENT_ID,
+          clientSecret: process.env.IOFINNET_CLIENT_SECRET,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Authentication failed: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      this.accessToken = data.accessToken;
+
+      return this.accessToken!;
+    } catch (error) {
+      throw new Error(`Failed to authenticate with IoFinnet: ${error}`);
+    }
+  }
+
+  private async ensureAuthenticated(): Promise<string> {
+    if (!this.accessToken) {
+      return await this.authenticate();
+    }
+    return this.accessToken!;
+  }
+
+  private encodeDER(r: Buffer, s: Buffer): Buffer {
+    // Helper function to encode an integer with proper DER formatting
+    const encodeInteger = (value: Buffer): Buffer => {
+      // Remove leading zeros except when the high bit is set
+      let start = 0;
+      while (start < value.length && value[start] === 0) {
+        start++;
+      }
+
+      let trimmed = value.slice(start);
+
+      // If empty or high bit is set, prepend a zero byte
+      if (trimmed.length === 0 || trimmed[0] >= 0x80) {
+        trimmed = Buffer.concat([Buffer.from([0x00]), trimmed]);
+      }
+
+      // Return: 0x02 (INTEGER tag) + length + value
+      return Buffer.concat([Buffer.from([0x02, trimmed.length]), trimmed]);
+    };
+
+    const rEncoded = encodeInteger(r);
+    const sEncoded = encodeInteger(s);
+    const payload = Buffer.concat([rEncoded, sEncoded]);
+
+    // Return: 0x30 (SEQUENCE tag) + length + payload
+    return Buffer.concat([Buffer.from([0x30, payload.length]), payload]);
   }
 
   async getPubkey(): Promise<string> {
@@ -286,20 +252,15 @@ export class IoFinnetSigner implements BaseSigner {
     }
   }
 
-  public async signTransaction(encodedMessage: string): Promise<string> {
+  private async signData(data: string): Promise<string> {
     const token = await this.ensureAuthenticated();
 
     try {
-      infoTerminal("Signing transaction with IoFinnet...", this.signerName);
-      await italicInfoTerminal(`Encoded message: ${encodedMessage}`);
-
       // Remove "0x" prefix if present
-      const cleanEncodedMessage = encodedMessage.startsWith("0x")
-        ? encodedMessage.slice(2)
-        : encodedMessage;
+      const cleanData = data.startsWith("0x") ? data.slice(2) : data;
 
       const signatureRequest = {
-        data: cleanEncodedMessage,
+        data: cleanData,
         coseAlgorithm: this.getIoFinnetCoseAlgorithm(
           this.signerSpec.curve,
           this.signerSpec.hashFunction
@@ -324,9 +285,7 @@ export class IoFinnetSigner implements BaseSigner {
       );
 
       if (!response.ok) {
-        throw new Error(
-          `Transaction signature request failed: ${response.statusText}`
-        );
+        throw new Error(`Signature request failed: ${response.statusText}`);
       }
 
       const signatureRequestData: IoFinnetSignatureResponse =
@@ -338,10 +297,6 @@ export class IoFinnetSigner implements BaseSigner {
       // Extract signature ID for polling
       const signatureId = signatureRequestData.signatureId;
       infoTerminal(`Signature ID: ${signatureId}`, this.signerName);
-      infoTerminal(
-        "Waiting for signature approval and completion...",
-        this.signerName
-      );
 
       // Poll for signature completion
       const completedSignature = await this.pollForSignatureCompletion(
@@ -349,15 +304,146 @@ export class IoFinnetSigner implements BaseSigner {
         token
       );
 
-      infoTerminal("Transaction signed successfully", this.signerName);
       return completedSignature;
     } catch (error) {
-      throw new Error(`Failed to sign transaction with IoFinnet: ${error}`);
+      throw new Error(`Failed to sign data with IoFinnet: ${error}`);
     }
+  }
+
+  private async signBitcoinPsbt(encodedMessage: string): Promise<string> {
+    // Parse the original PSBT
+    const psbt = Psbt.fromHex(encodedMessage);
+
+    if (!psbt.data.globalMap.unsignedTx) {
+      throw new Error("Unsigned transaction not available in PSBT.");
+    }
+
+    // Sign each hash separately and add signatures to PSBT
+    const signaturePromises = psbt.data.inputs.map(async (input, index) => {
+      const { hash } = getHashForSig(index, input, (psbt as any).__CACHE);
+
+      const hashHex = hash.toString("hex");
+
+      const signatureHex = await this.signData(hashHex);
+
+      // Convert raw signature to DER format and add SIGHASH flag
+      // IoFinnet returns raw ECDSA signatures (r + s + recovery), we need DER format
+      const rawSignature = Buffer.from(signatureHex.replace("0x", ""), "hex");
+
+      // Extract r and s components (32 bytes each) from the raw signature
+      const r = rawSignature.slice(0, 32);
+      const s = rawSignature.slice(32, 64);
+
+      // Convert to DER format
+      const derSignature = this.encodeDER(r, s);
+
+      // Append SIGHASH_ALL flag
+      const sighashType = input.sighashType || Transaction.SIGHASH_ALL;
+      const signatureBuffer = Buffer.concat([
+        derSignature,
+        Buffer.from([sighashType]),
+      ]);
+
+      // Add signature to the PSBT input
+      // Using the hardcoded public key as instructed
+      const publicKey = Buffer.from(HARDCODED_IOFINNET_BITCOIN_PUBKEY, "hex");
+
+      if (!input.partialSig) {
+        input.partialSig = [];
+      }
+
+      input.partialSig!.push({
+        pubkey: publicKey,
+        signature: signatureBuffer,
+      });
+    });
+
+    // Wait for all signatures to be added
+    await Promise.all(signaturePromises);
+
+    // Finalize the PSBT and return the raw transaction hex
+    return finalizeBitcoinPsbt(psbt);
+  }
+
+  public async signTransaction(encodedMessage: string): Promise<string> {
+    infoTerminal("Signing transaction with IoFinnet...", this.signerName);
+    await italicInfoTerminal(`Encoded message: ${encodedMessage}`);
+
+    // FIXME Temporary hack to sign each PSBT input one by one,
+    // until io.finnet supports signing a full PSBT
+    if (this.chainId === "bitcoin") {
+      return await this.signBitcoinPsbt(encodedMessage);
+    }
+
+    // For non-Bitcoin chains, use the extracted signData method
+    const signature = await this.signData(encodedMessage);
+    infoTerminal("Transaction signed successfully", this.signerName);
+    return signature;
   }
 
   public async signHash(hash: string): Promise<string> {
     // NOTE io.finnet always apply the hash themselves
     throw new Error("Not implemented");
+  }
+
+  private async pollForSignatureCompletion(
+    signatureId: string,
+    token: string
+  ): Promise<string> {
+    const maxAttempts = 60; // 10 minutes max (60 * 10s)
+    let attempts = 0;
+
+    while (attempts < maxAttempts) {
+      const response = await fetch(
+        `${this.baseUrl}/v1/vaults/${this.vaultId}/signatures/${signatureId}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to get signature status: ${response.statusText}`
+        );
+      }
+
+      const signatureData: IoFinnetSignatureResponse = await response.json();
+
+      infoTerminal(
+        `Signature status: ${signatureData.status}`,
+        this.signerName
+      );
+
+      if (signatureData.status === "COMPLETED") {
+        if (!signatureData.signingData.signature) {
+          throw new Error("Signature completed but no signature data found");
+        }
+        return signatureData.signingData.signature;
+      }
+
+      if (
+        signatureData.status === "FAILED" ||
+        signatureData.status === "CANCELLED"
+      ) {
+        throw new Error(
+          `Signature ${signatureData.status.toLowerCase()}: ${
+            signatureData.errorMessage || "Unknown error"
+          }`
+        );
+      }
+
+      // Wait 10 seconds before next poll
+      await new Promise((resolve) => setTimeout(resolve, 10000));
+      attempts++;
+    }
+
+    throw new Error(
+      "Signature completion timeout - exceeded maximum polling time"
+    );
   }
 }
