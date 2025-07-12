@@ -5,13 +5,8 @@ import {
 } from "../adamik/types";
 import { infoTerminal, italicInfoTerminal } from "../utils";
 import { Signer } from "./index";
-import {
-  finalizeBitcoinPsbt,
-  getHashForSig,
-  HARDCODED_IOFINNET_BITCOIN_PUBKEY,
-} from "./IoFinnet-bitcoin";
 import { BaseSigner } from "./types";
-import { Psbt, Transaction } from "bitcoinjs-lib";
+import { Transaction } from "bitcoinjs-lib";
 
 export interface IoFinnetSignatureResponse {
   id: string;
@@ -55,6 +50,18 @@ export interface IoFinnetSignatureResponse {
   expiresAt: string;
 }
 
+/**
+ * IoFinnet signer implementation for Adamik
+ *
+ * This signer integrates with IoFinnet's MPC signing service, supporting multiple blockchain networks.
+ * For Bitcoin, it uses a specialized signing approach that works with IoFinnet's ES256K algorithm.
+ *
+ * Key features:
+ * - Multi-chain support (Bitcoin, Ethereum, BSC, Polygon, Tron)
+ * - ES256K signature algorithm compatibility
+ * - Automatic signature polling and completion
+ * - Bitcoin PSBT signing with proper double-hash handling
+ */
 export class IoFinnetSigner implements BaseSigner {
   public chainId: string;
   public signerSpec: AdamikSignerSpec;
@@ -64,6 +71,17 @@ export class IoFinnetSigner implements BaseSigner {
   private accessToken: string | undefined;
   private vaultId: string;
   private address: string | undefined;
+
+  // Feature flag to control PSBT signing capability
+  // Set to true once IoFinnet adds native PSBT signing support
+  // When enabled, IoFinnet will attempt to sign the complete PSBT directly
+  // before falling back to individual hash signing
+  private readonly supportsPsbtSigning: boolean = false;
+
+  // Constants for configuration
+  private static readonly SIGNATURE_POLL_MAX_ATTEMPTS = 60; // 10 minutes max (60 * 10s)
+  private static readonly SIGNATURE_POLL_INTERVAL_MS = 10000; // 10 seconds
+  private static readonly MIN_TRANSACTION_LENGTH = 130; // Minimum length for a valid transaction
 
   constructor(chainId: string, signerSpec: AdamikSignerSpec) {
     infoTerminal("Initializing IoFinnet signer...", this.signerName);
@@ -89,6 +107,9 @@ export class IoFinnetSigner implements BaseSigner {
     return true;
   }
 
+  /**
+   * Convert Adamik chain ID to IoFinnet asset ID
+   */
   private convertChainIdToIoFinnetAssetId(chainId: string): string {
     switch (chainId) {
       case "bitcoin":
@@ -110,11 +131,13 @@ export class IoFinnetSigner implements BaseSigner {
     }
   }
 
+  /**
+   * Map Adamik signature specs to IoFinnet COSE algorithms
+   */
   private getIoFinnetCoseAlgorithm(
     curve: AdamikCurve,
     hashFunction: AdamikHashFunction
   ): string {
-    // Map Adamik curves and hash functions to IoFinnet COSE algorithms
     switch (curve) {
       case AdamikCurve.SECP256K1:
         switch (hashFunction) {
@@ -128,7 +151,6 @@ export class IoFinnetSigner implements BaseSigner {
             );
         }
       case AdamikCurve.ED25519:
-        // Ed25519 typically doesn't use external hash functions
         return "EDDSA"; // EdDSA with Ed25519
       case AdamikCurve.STARK:
         throw new Error(
@@ -139,6 +161,9 @@ export class IoFinnetSigner implements BaseSigner {
     }
   }
 
+  /**
+   * Authenticate with IoFinnet API and get access token
+   */
   private async authenticate(): Promise<string> {
     try {
       const response = await fetch(`${this.baseUrl}/v1/auth/accessToken`, {
@@ -166,6 +191,9 @@ export class IoFinnetSigner implements BaseSigner {
     }
   }
 
+  /**
+   * Ensure we have a valid access token, authenticating if necessary
+   */
   private async ensureAuthenticated(): Promise<string> {
     if (!this.accessToken) {
       return await this.authenticate();
@@ -173,38 +201,16 @@ export class IoFinnetSigner implements BaseSigner {
     return this.accessToken!;
   }
 
-  private encodeDER(r: Buffer, s: Buffer): Buffer {
-    // Helper function to encode an integer with proper DER formatting
-    const encodeInteger = (value: Buffer): Buffer => {
-      // Remove leading zeros except when the high bit is set
-      let start = 0;
-      while (start < value.length && value[start] === 0) {
-        start++;
-      }
-
-      let trimmed = value.slice(start);
-
-      // If empty or high bit is set, prepend a zero byte
-      if (trimmed.length === 0 || trimmed[0] >= 0x80) {
-        trimmed = Buffer.concat([Buffer.from([0x00]), trimmed]);
-      }
-
-      // Return: 0x02 (INTEGER tag) + length + value
-      return Buffer.concat([Buffer.from([0x02, trimmed.length]), trimmed]);
-    };
-
-    const rEncoded = encodeInteger(r);
-    const sEncoded = encodeInteger(s);
-    const payload = Buffer.concat([rEncoded, sEncoded]);
-
-    // Return: 0x30 (SEQUENCE tag) + length + payload
-    return Buffer.concat([Buffer.from([0x30, payload.length]), payload]);
-  }
-
   async getPubkey(): Promise<string> {
-    throw new Error("Not implemented");
+    throw new Error(
+      "Not implemented - IoFinnet does not expose public keys directly"
+    );
   }
 
+  /**
+   * Get address from IoFinnet vault
+   * Note: IoFinnet provides addresses directly, not public keys
+   */
   async getAddress(): Promise<string> {
     if (this.address) {
       return this.address;
@@ -226,14 +232,14 @@ export class IoFinnetSigner implements BaseSigner {
       );
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch public key: ${response.statusText}`);
+        throw new Error(`Failed to fetch address: ${response.statusText}`);
       }
 
-      const response_data = await response.json();
+      const responseData = await response.json();
 
       // Find the asset that matches our chainId
       const targetAssetId = this.convertChainIdToIoFinnetAssetId(this.chainId);
-      const asset = response_data.data.find(
+      const asset = responseData.data.find(
         (asset: any) => asset.id === targetAssetId
       );
 
@@ -243,15 +249,20 @@ export class IoFinnetSigner implements BaseSigner {
         );
       }
 
-      // NOTE io.finnet actually provides addresses, not public keys...
+      // Note: IoFinnet's API returns the address in the 'publicKey' field
       this.address = asset.publicKey;
-
       return this.address!;
     } catch (error) {
-      throw new Error(`Failed to get public key from IoFinnet: ${error}`);
+      throw new Error(`Failed to get address from IoFinnet: ${error}`);
     }
   }
 
+  /**
+   * Sign data with IoFinnet
+   *
+   * @param data - Hex string of data to sign
+   * @returns Hex string of signature
+   */
   private async signData(data: string): Promise<string> {
     const token = await this.ensureAuthenticated();
 
@@ -310,90 +321,145 @@ export class IoFinnetSigner implements BaseSigner {
     }
   }
 
+  /**
+   * Sign Bitcoin PSBT using IoFinnet
+   *
+   * This method uses a specialized approach for Bitcoin signing that works with IoFinnet's ES256K algorithm.
+   * It extracts the raw preimage data and sends the single SHA256 hash to IoFinnet, which then applies
+   * another SHA256 to produce the proper Bitcoin double-hash signature.
+   *
+   * The method checks the `supportsPsbtSigning` flag to determine whether to attempt direct PSBT signing
+   * first. If disabled (current state), it skips directly to individual hash signing for efficiency.
+   *
+   * @param encodedMessage - PSBT hex string
+   * @returns Finalized transaction hex string
+   */
   private async signBitcoinPsbt(encodedMessage: string): Promise<string> {
-    // Parse the original PSBT
-    const psbt = Psbt.fromHex(encodedMessage);
+    infoTerminal("Signing transaction with PSBT ...", this.signerName);
 
-    if (!psbt.data.globalMap.unsignedTx) {
-      throw new Error("Unsigned transaction not available in PSBT.");
+    // Check if IoFinnet supports direct PSBT signing
+    if (this.supportsPsbtSigning) {
+      infoTerminal(
+        "Attempting direct PSBT signing with IoFinnet...",
+        this.signerName
+      );
+      // Try to send the entire PSBT to IoFinnet to see if they can handle it directly
+      try {
+        const iofinnetResponse = await this.signData(encodedMessage);
+
+        // Check if IoFinnet returned a complete transaction
+        if (iofinnetResponse.length > IoFinnetSigner.MIN_TRANSACTION_LENGTH) {
+          infoTerminal(
+            `IoFinnet returned complete transaction (${
+              iofinnetResponse.length / 2
+            } bytes)`,
+            this.signerName
+          );
+
+          // Verify it's a valid transaction by parsing it
+          try {
+            const tx = Transaction.fromHex(iofinnetResponse);
+            infoTerminal(
+              `✅ IoFinnet returned valid transaction with ${tx.ins.length} inputs and ${tx.outs.length} outputs`,
+              this.signerName
+            );
+            return iofinnetResponse;
+          } catch (parseError) {
+            infoTerminal(
+              `❌ IoFinnet response is not a valid transaction: ${parseError}`,
+              this.signerName
+            );
+            throw new Error(
+              `IoFinnet returned invalid transaction: ${parseError}`
+            );
+          }
+        }
+
+        // If we get here, IoFinnet returned a regular signature, fall back to individual hash signing
+        infoTerminal(
+          "IoFinnet returned signature, falling back to individual hash signing",
+          this.signerName
+        );
+      } catch (error) {
+        infoTerminal(
+          `Direct PSBT signing failed: ${error}. Trying individual hash signing...`,
+          this.signerName
+        );
+      }
+    } else {
+      infoTerminal(
+        "IoFinnet does not support direct PSBT signing. Using individual hash signing approach.",
+        this.signerName
+      );
     }
 
-    // Sign each hash separately and add signatures to PSBT
-    const signaturePromises = psbt.data.inputs.map(async (input, index) => {
-      const { hash } = getHashForSig(index, input, (psbt as any).__CACHE);
+    // Use the specialized Bitcoin signing approach with proper hash handling
+    const { signBitcoinPsbtWithIoFinnetPreimage, getIoFinnetPublicKey } =
+      await import("./IoFinnet-bitcoin-preimage");
 
-      const hashHex = hash.toString("hex");
+    // Use the hardcoded public key to avoid extra signature call
+    const publicKey = getIoFinnetPublicKey();
+    infoTerminal(
+      `Using hardcoded public key: ${publicKey.toString("hex")}`,
+      this.signerName
+    );
 
-      const signatureHex = await this.signData(hashHex);
+    // Create a callback function to sign Bitcoin hash with IoFinnet
+    // This sends SHA256(preimage) to IoFinnet, which applies SHA256 again
+    // Result: SHA256(SHA256(preimage)) = proper Bitcoin double hash
+    const signBitcoinHashCallback = async (
+      bitcoinHash: string
+    ): Promise<string> => {
+      return await this.signData(bitcoinHash);
+    };
 
-      // Convert raw signature to DER format and add SIGHASH flag
-      // IoFinnet returns raw ECDSA signatures (r + s + recovery), we need DER format
-      const rawSignature = Buffer.from(signatureHex.replace("0x", ""), "hex");
-
-      // Extract r and s components (32 bytes each) from the raw signature
-      const r = rawSignature.slice(0, 32);
-      const s = rawSignature.slice(32, 64);
-
-      // Convert to DER format
-      const derSignature = this.encodeDER(r, s);
-
-      // Append SIGHASH_ALL flag
-      const sighashType = input.sighashType || Transaction.SIGHASH_ALL;
-      const signatureBuffer = Buffer.concat([
-        derSignature,
-        Buffer.from([sighashType]),
-      ]);
-
-      // Add signature to the PSBT input
-      // Using the hardcoded public key as instructed
-      const publicKey = Buffer.from(HARDCODED_IOFINNET_BITCOIN_PUBKEY, "hex");
-
-      if (!input.partialSig) {
-        input.partialSig = [];
-      }
-
-      input.partialSig!.push({
-        pubkey: publicKey,
-        signature: signatureBuffer,
-      });
-    });
-
-    // Wait for all signatures to be added
-    await Promise.all(signaturePromises);
-
-    // Finalize the PSBT and return the raw transaction hex
-    return finalizeBitcoinPsbt(psbt);
+    // Use the specialized Bitcoin PSBT signing approach
+    return await signBitcoinPsbtWithIoFinnetPreimage(
+      encodedMessage,
+      signBitcoinHashCallback,
+      publicKey
+    );
   }
 
+  /**
+   * Sign a transaction with IoFinnet
+   *
+   * @param encodedMessage - Transaction data to sign (hex string)
+   * @returns Signature or finalized transaction hex string
+   */
   public async signTransaction(encodedMessage: string): Promise<string> {
     infoTerminal("Signing transaction with IoFinnet...", this.signerName);
     await italicInfoTerminal(`Encoded message: ${encodedMessage}`);
 
-    // FIXME Temporary hack to sign each PSBT input one by one,
-    // until io.finnet supports signing a full PSBT
+    // Bitcoin requires special handling due to PSBT format and double-hash requirements
     if (this.chainId === "bitcoin") {
       return await this.signBitcoinPsbt(encodedMessage);
     }
 
-    // For non-Bitcoin chains, use the extracted signData method
+    // For non-Bitcoin chains, use the standard signing method
     const signature = await this.signData(encodedMessage);
     infoTerminal("Transaction signed successfully", this.signerName);
     return signature;
   }
 
   public async signHash(hash: string): Promise<string> {
-    // NOTE io.finnet always apply the hash themselves
-    throw new Error("Not implemented");
+    throw new Error("Not implemented - IoFinnet applies hashing internally");
   }
 
+  /**
+   * Poll IoFinnet API for signature completion
+   *
+   * @param signatureId - ID of the signature request
+   * @param token - Authentication token
+   * @returns Completed signature hex string
+   */
   private async pollForSignatureCompletion(
     signatureId: string,
     token: string
   ): Promise<string> {
-    const maxAttempts = 60; // 10 minutes max (60 * 10s)
     let attempts = 0;
 
-    while (attempts < maxAttempts) {
+    while (attempts < IoFinnetSigner.SIGNATURE_POLL_MAX_ATTEMPTS) {
       const response = await fetch(
         `${this.baseUrl}/v1/vaults/${this.vaultId}/signatures/${signatureId}`,
         {
@@ -437,8 +503,10 @@ export class IoFinnetSigner implements BaseSigner {
         );
       }
 
-      // Wait 10 seconds before next poll
-      await new Promise((resolve) => setTimeout(resolve, 10000));
+      // Wait before next poll
+      await new Promise((resolve) =>
+        setTimeout(resolve, IoFinnetSigner.SIGNATURE_POLL_INTERVAL_MS)
+      );
       attempts++;
     }
 

@@ -95,12 +95,20 @@ export const adamikLink = async () => {
 
   infoTerminal(`We will now prepare an unsigned transaction ...`);
 
-  const { continueTransaction } = await overridedPrompt({
-    type: "confirm",
-    name: "continueTransaction",
-    message: "Do you want to continue? (No to restart)",
-    initial: true,
-  });
+  let continueTransaction;
+  try {
+    const result = await overridedPrompt({
+      type: "confirm",
+      name: "continueTransaction",
+      message: "Do you want to continue? (No to restart)",
+      initial: true,
+    });
+    continueTransaction = result.continueTransaction;
+  } catch (error) {
+    errorTerminal(`Prompt error: ${error}`, "DEBUG");
+    infoTerminal("Defaulting to continue transaction...", "DEBUG");
+    continueTransaction = true;
+  }
 
   if (!continueTransaction) {
     infoTerminal("Transaction cancelled. Restarting...");
@@ -156,23 +164,41 @@ export const adamikLink = async () => {
   }
 
   const choices = transactionEncodeResponse.transaction.encoded.reduce(
-    (acc, encoded) => {
-      if (encoded.hash) {
-        acc.push({
-          title: `Hash (${encoded.hash.format}) : ${encoded.hash.value}`,
-          value: encoded.hash.format,
-        });
-      }
-      if (encoded.raw) {
-        acc.push({
-          title: `Raw (${encoded.raw.format}) : ${encoded.raw.value}`,
-          value: encoded.raw.format,
-        });
+    (acc, encoded, index) => {
+      try {
+        if (encoded?.hash) {
+          acc.push({
+            title: `Hash (${encoded.hash.format}) : ${encoded.hash.value}`,
+            value: encoded.hash.format,
+          });
+        }
+        if (encoded?.raw) {
+          acc.push({
+            title: `Raw (${encoded.raw.format}) : ${encoded.raw.value}`,
+            value: encoded.raw.format,
+          });
+        }
+      } catch (error) {
+        errorTerminal(`Error processing encoded[${index}]: ${error}`, "DEBUG");
+        errorTerminal(`Encoded object: ${JSON.stringify(encoded)}`, "DEBUG");
       }
       return acc;
     },
     [] as { title: string; value: string }[]
   );
+
+  if (choices.length === 0) {
+    errorTerminal("No valid signing choices found", "Adamik");
+    errorTerminal(
+      `Transaction encoded: ${JSON.stringify(
+        transactionEncodeResponse.transaction.encoded,
+        null,
+        2
+      )}`,
+      "DEBUG"
+    );
+    throw new Error("No valid signing formats available");
+  }
 
   const { toSign } = await overridedPrompt({
     type: "select",
