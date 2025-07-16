@@ -6,12 +6,7 @@ import { encodeTransaction } from "./adamik/encodeTransaction";
 import { getAccountState } from "./adamik/getAccountState";
 import { adamikGetChains } from "./adamik/getChains";
 import { signerSelector } from "./signers";
-import {
-  errorTerminal,
-  infoTerminal,
-  italicInfoTerminal,
-  overridedPrompt,
-} from "./utils";
+import { errorTerminal, infoTerminal, italicInfoTerminal, overridedPrompt } from "./utils";
 import { displayBalance } from "./utils/displayBalance";
 import { transactionDetailView } from "./utils/displayTransaction";
 
@@ -72,10 +67,7 @@ export const adamikLink = async () => {
       infoTerminal(`Address:`, signer.signerName);
       await italicInfoTerminal(address);
     } catch (signerError) {
-      errorTerminal(
-        `Failed to get address from signer: ${signerError}`,
-        signer.signerName
-      );
+      errorTerminal(`Failed to get address from signer: ${signerError}`, signer.signerName);
       return;
     }
   }
@@ -105,8 +97,6 @@ export const adamikLink = async () => {
     });
     continueTransaction = result.continueTransaction;
   } catch (error) {
-    errorTerminal(`Prompt error: ${error}`, "DEBUG");
-    infoTerminal("Defaulting to continue transaction...", "DEBUG");
     continueTransaction = true;
   }
 
@@ -136,13 +126,9 @@ export const adamikLink = async () => {
   );
   infoTerminal(`- Chain ID: ${transactionEncodeResponse.chainId}`, "Adamik");
   infoTerminal(`- Transaction data:`, "Adamik");
-  await italicInfoTerminal(
-    JSON.stringify(transactionEncodeResponse.transaction.data, null, 2)
-  );
+  await italicInfoTerminal(JSON.stringify(transactionEncodeResponse.transaction.data, null, 2));
   infoTerminal(`- Message to sign :`, "Adamik");
-  await italicInfoTerminal(
-    JSON.stringify(transactionEncodeResponse.transaction.encoded, null, 2)
-  );
+  await italicInfoTerminal(JSON.stringify(transactionEncodeResponse.transaction.encoded, null, 2));
 
   infoTerminal("========================================");
 
@@ -163,40 +149,28 @@ export const adamikLink = async () => {
     return;
   }
 
-  const choices = transactionEncodeResponse.transaction.encoded.reduce(
-    (acc, encoded, index) => {
-      try {
-        if (encoded?.hash) {
-          acc.push({
-            title: `Hash (${encoded.hash.format}) : ${encoded.hash.value}`,
-            value: encoded.hash.format,
-          });
-        }
-        if (encoded?.raw) {
-          acc.push({
-            title: `Raw (${encoded.raw.format}) : ${encoded.raw.value}`,
-            value: encoded.raw.format,
-          });
-        }
-      } catch (error) {
-        errorTerminal(`Error processing encoded[${index}]: ${error}`, "DEBUG");
-        errorTerminal(`Encoded object: ${JSON.stringify(encoded)}`, "DEBUG");
+  const choices = transactionEncodeResponse.transaction.encoded.reduce((acc, encoded, index) => {
+    try {
+      if (encoded?.hash) {
+        acc.push({
+          title: `Hash (${encoded.hash.format}) : ${encoded.hash.value}`,
+          value: encoded.hash.format,
+        });
       }
-      return acc;
-    },
-    [] as { title: string; value: string }[]
-  );
+      if (encoded?.raw) {
+        acc.push({
+          title: `Raw (${encoded.raw.format}) : ${encoded.raw.value}`,
+          value: encoded.raw.format,
+        });
+      }
+    } catch (error) {
+      // Skip invalid encoded objects
+    }
+    return acc;
+  }, [] as { title: string; value: string }[]);
 
   if (choices.length === 0) {
     errorTerminal("No valid signing choices found", "Adamik");
-    errorTerminal(
-      `Transaction encoded: ${JSON.stringify(
-        transactionEncodeResponse.transaction.encoded,
-        null,
-        2
-      )}`,
-      "DEBUG"
-    );
     throw new Error("No valid signing formats available");
   }
 
@@ -224,10 +198,7 @@ export const adamikLink = async () => {
     return;
   }
 
-  infoTerminal(
-    `Signing ${isHashPayload ? "hash" : "transaction"} with ${toSign} ...`,
-    signer.signerName
-  );
+  infoTerminal(`Signing ${isHashPayload ? "hash" : "transaction"} with ${toSign} ...`, signer.signerName);
 
   const signature = isHashPayload
     ? await signer.signHash(isHashPayload)
@@ -258,11 +229,7 @@ export const adamikLink = async () => {
     )
   );
 
-  const broadcastResponse = await broadcastTransaction(
-    chainId,
-    transactionEncodeResponse,
-    signature
-  );
+  const broadcastResponse = await broadcastTransaction(chainId, transactionEncodeResponse, signature);
 
   if (!broadcastResponse) {
     throw new Error("Broadcast aborted");
