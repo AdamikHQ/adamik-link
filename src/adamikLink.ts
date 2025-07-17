@@ -65,6 +65,7 @@ export const adamikLink = async () => {
 
   infoTerminal(`Fetching balance ...`, "Adamik");
   const accountState = await getAccountState(chainId, address);
+
   displayBalance(accountState, chains, chainId);
 
   if (accountState.balances.native.available === "0") {

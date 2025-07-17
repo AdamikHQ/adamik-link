@@ -138,8 +138,8 @@ export const displayBalance = (
 
     // Show staking rewards
     if (
-      accountState.balances.staking.rewards.native.length > 0 ||
-      accountState.balances.staking.rewards.tokens.length > 0
+      accountState.balances.staking.rewards?.native.length ||
+      accountState.balances.staking.rewards?.tokens.length
     ) {
       const rewardsTable = new Table({
         style: { head: ["cyan"] },

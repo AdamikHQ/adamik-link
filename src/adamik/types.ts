@@ -79,7 +79,7 @@ export type AdamikAccountState = {
       unlocking: string;
       unlocked: string;
       positions: StakingPosition[];
-      rewards: {
+      rewards?: {
         native: StakingReward[];
         tokens: TokenStakingReward[];
       };
