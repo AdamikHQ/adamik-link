@@ -105,6 +105,28 @@ export const verifyTransaction = async (
       });
     }
 
+    // Add validator row for staking transactions
+    if (originalIntent.targetValidatorAddress || originalIntent.validatorAddress) {
+      const intentValidator = originalIntent.targetValidatorAddress || originalIntent.validatorAddress;
+      const apiValidator = transactionEncodeResponse.transaction.data.targetValidatorAddress || 
+                          transactionEncodeResponse.transaction.data.validatorAddress;
+      const decodedValidator = hasRealDecoding ? 
+        ((verificationResult.decodedData?.transaction as any)?.targetValidatorAddress || 
+         (verificationResult.decodedData?.transaction as any)?.validatorAddress) : null;
+
+      rows.push({
+        field: 'Validator',
+        intent: intentValidator?.slice(0, 20) + '...',
+        apiResponse: apiValidator?.slice(0, 20) + '...' || 'N/A',
+        decoded: hasRealDecoding ?
+          (decodedValidator ? decodedValidator.slice(0, 20) + '...' : 'N/A')
+          : 'Not decoded',
+        status: hasRealDecoding ?
+          (intentValidator === decodedValidator ? '✅' : '❌') :
+          (intentValidator === apiValidator ? '✅' : '❌')
+      });
+    }
+
     // Add amount row if applicable
     if (originalIntent.amount) {
       const displayAmount = (amount: string) => {
