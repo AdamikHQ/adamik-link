@@ -52,18 +52,22 @@ export const verifyTransaction = async (
     // Create verification table
     const table = new Table({
       head: ['Field', 'Your Intent', 'API Response', 'Decoded Value', 'Status'],
-      colWidths: [20, 25, 25, 25, 8],
+      colWidths: [15, 25, 25, 25, 10],
       style: { head: ['cyan'] }
     });
 
     const rows: VerificationTableRow[] = [];
+    
+    // Check if we have real decoded data or just placeholder
+    const hasRealDecoding = verificationResult.decodedData && 
+      !(verificationResult.warnings?.some((w: any) => w.message.includes('placeholder decoder')));
 
     // Add mode row
     rows.push({
       field: 'Mode',
       intent: originalIntent.mode,
       apiResponse: transactionEncodeResponse.transaction.data.mode,
-      decoded: (verificationResult.decodedData?.transaction as any)?.mode || 'N/A',
+      decoded: hasRealDecoding ? ((verificationResult.decodedData?.transaction as any)?.mode || 'N/A') : 'Not decoded',
       status: originalIntent.mode === transactionEncodeResponse.transaction.data.mode ? '✅' : '❌'
     });
 
@@ -72,8 +76,10 @@ export const verifyTransaction = async (
       field: 'Sender',
       intent: originalIntent.senderAddress?.slice(0, 20) + '...',
       apiResponse: transactionEncodeResponse.transaction.data.senderAddress?.slice(0, 20) + '...',
-      decoded: (verificationResult.decodedData?.transaction as any)?.senderAddress ? 
-        (verificationResult.decodedData?.transaction as any).senderAddress.slice(0, 20) + '...' : 'N/A',
+      decoded: hasRealDecoding ? 
+        ((verificationResult.decodedData?.transaction as any)?.senderAddress ? 
+          (verificationResult.decodedData?.transaction as any).senderAddress.slice(0, 20) + '...' : 'N/A') 
+        : 'Not decoded',
       status: originalIntent.senderAddress === transactionEncodeResponse.transaction.data.senderAddress ? '✅' : '❌'
     });
 
@@ -83,8 +89,10 @@ export const verifyTransaction = async (
         field: 'Recipient',
         intent: originalIntent.recipientAddress.slice(0, 20) + '...',
         apiResponse: transactionEncodeResponse.transaction.data.recipientAddress?.slice(0, 20) + '...' || 'N/A',
-        decoded: (verificationResult.decodedData?.transaction as any)?.recipientAddress ? 
-          (verificationResult.decodedData?.transaction as any).recipientAddress.slice(0, 20) + '...' : 'N/A',
+        decoded: hasRealDecoding ?
+          ((verificationResult.decodedData?.transaction as any)?.recipientAddress ? 
+            (verificationResult.decodedData?.transaction as any).recipientAddress.slice(0, 20) + '...' : 'N/A')
+          : 'Not decoded',
         status: originalIntent.recipientAddress === transactionEncodeResponse.transaction.data.recipientAddress ? '✅' : '❌'
       });
     }
@@ -100,8 +108,10 @@ export const verifyTransaction = async (
         field: 'Amount',
         intent: displayAmount(originalIntent.amount),
         apiResponse: displayAmount(transactionEncodeResponse.transaction.data.amount),
-        decoded: (verificationResult.decodedData?.transaction as any)?.amount ? 
-          displayAmount((verificationResult.decodedData?.transaction as any).amount) : 'N/A',
+        decoded: hasRealDecoding ?
+          ((verificationResult.decodedData?.transaction as any)?.amount ? 
+            displayAmount((verificationResult.decodedData?.transaction as any).amount) : 'N/A')
+          : 'Not decoded',
         status: originalIntent.amount === transactionEncodeResponse.transaction.data.amount ? '✅' : '❌'
       });
     }
@@ -112,8 +122,10 @@ export const verifyTransaction = async (
         field: 'Token',
         intent: originalIntent.tokenId.slice(0, 20) + '...',
         apiResponse: transactionEncodeResponse.transaction.data.tokenId?.slice(0, 20) + '...' || 'N/A',
-        decoded: (verificationResult.decodedData?.transaction as any)?.tokenId ? 
-          (verificationResult.decodedData?.transaction as any).tokenId.slice(0, 20) + '...' : 'N/A',
+        decoded: hasRealDecoding ?
+          ((verificationResult.decodedData?.transaction as any)?.tokenId ? 
+            (verificationResult.decodedData?.transaction as any).tokenId.slice(0, 20) + '...' : 'N/A')
+          : 'Not decoded',
         status: originalIntent.tokenId === transactionEncodeResponse.transaction.data.tokenId ? '✅' : '❌'
       });
     }
@@ -169,16 +181,19 @@ export const verifyTransaction = async (
 
       throw new Error("Transaction verification failed - transaction data does not match your original request");
     } else {
-      successInfoTerminal("\n✅ VERIFICATION SUCCESSFUL", "Verification");
+      successInfoTerminal("\n✅ VERIFICATION SUCCESSFUL - Transaction data matches your intent", "Verification");
       
       if (verificationResult.warnings && verificationResult.warnings.length > 0) {
         warningTerminal("\n⚠️ Warnings:", "Verification");
         verificationResult.warnings.forEach((warning: any) => {
-          warningTerminal(`  • ${warning.message}`, "Verification");
+          // Improve the placeholder decoder warning message
+          if (warning.message.includes('placeholder decoder')) {
+            warningTerminal(`  • Adamik SDK does not yet have a decoder for this chain - only intent validation performed`, "Verification");
+          } else {
+            warningTerminal(`  • ${warning.message}`, "Verification");
+          }
         });
       }
-      
-      successInfoTerminal("✓ Transaction data matches your intent", "Verification");
     }
 
     // Note: Fees are not available in the transaction data at this point
