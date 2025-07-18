@@ -14,6 +14,7 @@ import {
 } from "./utils";
 import { displayBalance } from "./utils/displayBalance";
 import { transactionDetailView } from "./utils/displayTransaction";
+import { verifyTransaction } from "./adamik/verifyTransaction";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 
@@ -119,6 +120,21 @@ export const adamikLink = async () => {
   );
 
   infoTerminal("========================================");
+
+  // Now verify the transaction after displaying the details
+  // Store the original intent that was sent to the API
+  const originalIntent = {
+    mode: transactionEncodeResponse.transaction.data.mode,
+    senderAddress: address,
+    recipientAddress: transactionEncodeResponse.transaction.data.recipientAddress,
+    amount: transactionEncodeResponse.transaction.data.amount,
+    tokenId: transactionEncodeResponse.transaction.data.tokenId,
+    targetValidatorAddress: transactionEncodeResponse.transaction.data.targetValidatorAddress,
+    senderPubKey: pubkey,
+  };
+
+  // Verify the transaction using the table-based display
+  await verifyTransaction(transactionEncodeResponse, originalIntent, chains[chainId]);
 
   infoTerminal(`We will now sign the transaction ...`);
 
