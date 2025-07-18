@@ -3,6 +3,9 @@ import {
   amountToSmallestUnit,
   errorTerminal,
   infoTerminal,
+  italicInfoTerminal,
+  successInfoTerminal,
+  warningTerminal,
   overridedPrompt,
 } from "../utils";
 import { deployAccount } from "./deployAccount";
@@ -13,7 +16,8 @@ import {
   AdamikTransactionEncodeRequest,
   AdamikTransactionEncodeResponse,
 } from "./types";
-import { Choice } from 'prompts';
+import { Choice } from "prompts";
+import AdamikSDK from "adamik-sdk";
 
 export const encodeTransaction = async ({
   chain,
@@ -271,6 +275,178 @@ export const encodeTransaction = async ({
       transactionEncodeResponse.status.errors[0].message ||
       "Transaction encoding failed"
     );
+  }
+
+  // Verify the transaction response with Adamik SDK
+  infoTerminal("========================================");
+  infoTerminal("🔍 Starting Adamik SDK Verification...", "Security Check");
+  
+  try {
+    const sdk = new AdamikSDK();
+    // Remove status field and convert to SDK expected format
+    const { status, ...apiResponseForSDK } = transactionEncodeResponse;
+    
+    // Display what we're checking
+    infoTerminal("📋 Verification Steps:", "Security Check");
+    infoTerminal("  1️⃣  Intent Validation - Compare your request vs API response", "Security Check");
+    infoTerminal("  2️⃣  Encoded Validation - Decode transaction bytes and verify", "Security Check");
+    
+    // Display chain and format info
+    const encodedFormat = transactionEncodeResponse.transaction.encoded?.[0]?.raw?.format || "Unknown";
+    infoTerminal("\n🔗 Chain Information:", "Security Check");
+    infoTerminal(`  • Chain: ${chain.name} (${chain.id})`, "Security Check");
+    infoTerminal(`  • Transaction Format: ${encodedFormat}`, "Security Check");
+    
+    // Show protection level based on chain
+    const fullProtectionChains = ["ethereum", "sepolia", "polygon", "bsc", "avalanche", "arbitrum", "optimism", "base", "bitcoin", "bitcoin-testnet", "cosmoshub", "celestia", "injective", "babylon-testnet"];
+    const isFullProtection = fullProtectionChains.includes(chain.id);
+    
+    if (isFullProtection) {
+      successInfoTerminal("  • Protection Level: 🛡️  FULL (Intent + Encoded validation)", "Security Check");
+    } else {
+      warningTerminal("  • Protection Level: ⚠️  PARTIAL (Intent validation only)", "Security Check");
+      warningTerminal("    Note: Encoded transaction validation not yet available for this chain", "Security Check");
+    }
+    
+    infoTerminal("\n🔎 Checking fields:", "Security Check");
+    const intent = requestBody.transaction.data as any;
+    const txData = transactionEncodeResponse.transaction.data as any;
+    
+    // Format the mode for display
+    const modeDisplay = {
+      transfer: "Native Transfer",
+      transferToken: "Token Transfer",
+      stake: "Staking",
+      unstake: "Unstaking",
+      withdraw: "Withdrawal",
+      deployAccount: "Account Deployment"
+    }[intent.mode as string] || intent.mode;
+    
+    infoTerminal(`  • Mode: ${modeDisplay} (${intent.mode})`, "Security Check");
+    infoTerminal(`  • Sender: ${intent.senderAddress}`, "Security Check");
+    
+    if (intent.recipientAddress) {
+      infoTerminal(`  • Recipient: ${intent.recipientAddress}`, "Security Check");
+    }
+    
+    if (intent.amount) {
+      // Try to format amount with token info
+      const assetInfo = intent.tokenId ? 
+        ` ${intent.tokenId}` : 
+        ` ${chain.ticker}`;
+      const displayAmount = amountToMainUnit(intent.amount, chain.decimals);
+      infoTerminal(`  • Amount: ${displayAmount}${assetInfo}`, "Security Check");
+    }
+    
+    if (intent.tokenId) {
+      infoTerminal(`  • Token Contract: ${intent.tokenId}`, "Security Check");
+    }
+    
+    if (intent.validatorAddress || intent.targetValidatorAddress) {
+      infoTerminal(`  • Validator: ${intent.validatorAddress || intent.targetValidatorAddress}`, "Security Check");
+    }
+    
+    // Show fees if available
+    if (txData.fees) {
+      const feeDisplay = amountToMainUnit(txData.fees, chain.decimals);
+      infoTerminal(`  • Estimated Fees: ${feeDisplay} ${chain.ticker}`, "Security Check");
+    }
+    
+    const verificationResult = await sdk.verify(
+      apiResponseForSDK as any,
+      requestBody.transaction.data as any
+    );
+
+    if (!verificationResult.isValid) {
+      errorTerminal("\n🚨 VERIFICATION FAILED - SECURITY THREAT DETECTED!", "Security Check");
+      
+      // Display errors by category
+      if (verificationResult.criticalErrors && verificationResult.criticalErrors.length > 0) {
+        errorTerminal("\n💀 CRITICAL SECURITY ISSUES:", "Security Check");
+        verificationResult.criticalErrors.forEach((error: any) => {
+          errorTerminal(`  🚨 ${error.code}: ${error.message}`, "Security Check");
+          if (error.context) {
+            errorTerminal(`     Expected: ${error.context.expected}`, "Security Check");
+            errorTerminal(`     Actual: ${error.context.actual}`, "Security Check");
+          }
+        });
+      }
+      
+      if (verificationResult.errors && verificationResult.errors.length > 0) {
+        errorTerminal("\n❌ VALIDATION ERRORS:", "Security Check");
+        verificationResult.errors.forEach((error: any) => {
+          errorTerminal(`  • ${error.code}: ${error.message}`, "Security Check");
+          if (error.field) {
+            errorTerminal(`    Field: ${error.field}`, "Security Check");
+          }
+        });
+      }
+
+      // Show detailed comparison
+      errorTerminal("\n📊 DETAILED COMPARISON:", "Security Check");
+      errorTerminal("Your Intent:", "Security Check");
+      await italicInfoTerminal(JSON.stringify(requestBody.transaction.data, null, 2));
+      errorTerminal("\nAPI Response:", "Security Check");
+      await italicInfoTerminal(JSON.stringify(transactionEncodeResponse.transaction.data, null, 2));
+
+      throw new Error("Transaction verification failed - DO NOT SIGN THIS TRANSACTION!");
+    }
+
+    // Success with detailed results
+    successInfoTerminal("\n✅ VERIFICATION SUCCESSFUL", "Security Check");
+    
+    // Show warnings if any
+    if (verificationResult.warnings && verificationResult.warnings.length > 0) {
+      warningTerminal("\n⚠️  Warnings:", "Security Check");
+      verificationResult.warnings.forEach((warning: any) => {
+        warningTerminal(`  • ${warning.message}`, "Security Check");
+      });
+    }
+    
+    // Show what was verified
+    successInfoTerminal("\n✓ Verified Checks:", "Security Check");
+    successInfoTerminal("  ✅ Transaction mode matches your intent", "Security Check");
+    successInfoTerminal("  ✅ Sender address matches", "Security Check");
+    if (intent.recipientAddress) {
+      successInfoTerminal("  ✅ Recipient address matches", "Security Check");
+    }
+    if (intent.amount) {
+      successInfoTerminal("  ✅ Amount matches exactly", "Security Check");
+    }
+    if (intent.tokenId) {
+      successInfoTerminal("  ✅ Token contract matches", "Security Check");
+    }
+    
+    // Show decoded transaction info if available
+    if (verificationResult.decodedData) {
+      infoTerminal("\n🔐 Decoded Transaction:", "Security Check");
+      const decoded = verificationResult.decodedData.transaction as any;
+      if (decoded && typeof decoded === 'object') {
+        if (decoded.recipientAddress || decoded.to) {
+          infoTerminal(`  • Decoded recipient: ${decoded.recipientAddress || decoded.to}`, "Security Check");
+        }
+        if (decoded.amount || decoded.value) {
+          infoTerminal(`  • Decoded amount: ${decoded.amount || decoded.value}`, "Security Check");
+        }
+        if (decoded.mode) {
+          infoTerminal(`  • Decoded mode: ${decoded.mode}`, "Security Check");
+        }
+      }
+    }
+    
+    successInfoTerminal("\n🛡️  Transaction is SAFE to sign", "Security Check");
+    infoTerminal("========================================");
+    
+  } catch (error) {
+    // If it's our verification error, re-throw it
+    if (error instanceof Error && error.message.includes("verification failed")) {
+      throw error;
+    }
+    
+    // For other errors (like SDK issues), log but don't block
+    warningTerminal(`\n⚠️  SDK verification error: ${error}`, "Security Check");
+    warningTerminal("Proceeding with caution - manual verification recommended", "Security Check");
+    infoTerminal("========================================");
   }
 
   return transactionEncodeResponse;
