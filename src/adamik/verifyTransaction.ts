@@ -58,9 +58,11 @@ export const verifyTransaction = async (
 
     const rows: VerificationTableRow[] = [];
     
-    // Check if we have real decoded data or just placeholder
+    // Check if we have real decoded data or just placeholder/missing decoder
     const hasRealDecoding = verificationResult.decodedData && 
-      !(verificationResult.warnings?.some((w: any) => w.message.includes('placeholder decoder')));
+      !(verificationResult.warnings?.some((w: any) => 
+        w.message.includes('placeholder decoder') || 
+        w.message.includes('No decoder available')));
 
     // Add mode row
     rows.push({
@@ -150,9 +152,9 @@ export const verifyTransaction = async (
     chainTable.push(
       ['Chain', `${chain.name} (${chain.id})`],
       ['Transaction Format', encodedFormat],
-      ['Verification Level', isFullProtection ? 'COMPLETE ✅' : 'PARTIAL ⚠️'],
-      ['Intent Validation', '✅ Enabled'],
-      ['Encoded Validation', isFullProtection ? '✅ Enabled' : '⚠️ Not Available']
+      ['Verification Level', isFullProtection ? 'COMPLETE' : 'PARTIAL'],
+      ['Intent Validation', 'Enabled'],
+      ['Encoded Validation', isFullProtection ? 'Enabled' : 'Not Available']
     );
 
     console.log(chainTable.toString());
@@ -181,13 +183,23 @@ export const verifyTransaction = async (
 
       throw new Error("Transaction verification failed - transaction data does not match your original request");
     } else {
-      successInfoTerminal("\n✅ VERIFICATION SUCCESSFUL - Transaction data matches your intent", "Verification");
+      // Check if we have warnings about missing decoders
+      const hasDecoderWarnings = verificationResult.warnings?.some((w: any) => 
+        w.message.includes('placeholder decoder') || 
+        w.message.includes('No decoder available')
+      );
+      
+      if (hasDecoderWarnings) {
+        warningTerminal("\n⚠️ PARTIAL VERIFICATION - Intent validated but encoded transaction could not be decoded", "Verification");
+      } else {
+        successInfoTerminal("\n✅ VERIFICATION SUCCESSFUL - Transaction data matches your intent", "Verification");
+      }
       
       if (verificationResult.warnings && verificationResult.warnings.length > 0) {
         warningTerminal("\n⚠️ Warnings:", "Verification");
         verificationResult.warnings.forEach((warning: any) => {
-          // Improve the placeholder decoder warning message
-          if (warning.message.includes('placeholder decoder')) {
+          // Improve the decoder warning messages
+          if (warning.message.includes('placeholder decoder') || warning.message.includes('No decoder available')) {
             warningTerminal(`  • Adamik SDK does not yet have a decoder for this chain - only intent validation performed`, "Verification");
           } else {
             warningTerminal(`  • ${warning.message}`, "Verification");
