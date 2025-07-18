@@ -69,8 +69,10 @@ export const verifyTransaction = async (
       field: 'Mode',
       intent: originalIntent.mode,
       apiResponse: transactionEncodeResponse.transaction.data.mode,
-      decoded: hasRealDecoding ? ((verificationResult.decodedData?.transaction as any)?.mode || 'N/A') : 'Not decoded',
-      status: originalIntent.mode === transactionEncodeResponse.transaction.data.mode ? '✅' : '❌'
+      decoded: hasRealDecoding ? ((verificationResult.decodedData?.raw as any)?.mode || 'N/A') : 'Not decoded',
+      status: hasRealDecoding ? 
+        (originalIntent.mode === (verificationResult.decodedData?.raw as any)?.mode ? '✅' : '❌') :
+        (originalIntent.mode === transactionEncodeResponse.transaction.data.mode ? '✅' : '❌')
     });
 
     // Add sender row
@@ -79,10 +81,12 @@ export const verifyTransaction = async (
       intent: originalIntent.senderAddress?.slice(0, 20) + '...',
       apiResponse: transactionEncodeResponse.transaction.data.senderAddress?.slice(0, 20) + '...',
       decoded: hasRealDecoding ? 
-        ((verificationResult.decodedData?.transaction as any)?.senderAddress ? 
-          (verificationResult.decodedData?.transaction as any).senderAddress.slice(0, 20) + '...' : 'N/A') 
+        ((verificationResult.decodedData?.raw as any)?.senderAddress ? 
+          (verificationResult.decodedData?.raw as any).senderAddress.slice(0, 20) + '...' : 'N/A') 
         : 'Not decoded',
-      status: originalIntent.senderAddress === transactionEncodeResponse.transaction.data.senderAddress ? '✅' : '❌'
+      status: hasRealDecoding ?
+        (originalIntent.senderAddress === (verificationResult.decodedData?.raw as any)?.senderAddress ? '✅' : '❌') :
+        (originalIntent.senderAddress === transactionEncodeResponse.transaction.data.senderAddress ? '✅' : '❌')
     });
 
     // Add recipient row if applicable
@@ -92,10 +96,12 @@ export const verifyTransaction = async (
         intent: originalIntent.recipientAddress.slice(0, 20) + '...',
         apiResponse: transactionEncodeResponse.transaction.data.recipientAddress?.slice(0, 20) + '...' || 'N/A',
         decoded: hasRealDecoding ?
-          ((verificationResult.decodedData?.transaction as any)?.recipientAddress ? 
-            (verificationResult.decodedData?.transaction as any).recipientAddress.slice(0, 20) + '...' : 'N/A')
+          ((verificationResult.decodedData?.raw as any)?.recipientAddress ? 
+            (verificationResult.decodedData?.raw as any).recipientAddress.slice(0, 20) + '...' : 'N/A')
           : 'Not decoded',
-        status: originalIntent.recipientAddress === transactionEncodeResponse.transaction.data.recipientAddress ? '✅' : '❌'
+        status: hasRealDecoding ?
+        (originalIntent.recipientAddress === (verificationResult.decodedData?.raw as any)?.recipientAddress ? '✅' : '❌') :
+        (originalIntent.recipientAddress === transactionEncodeResponse.transaction.data.recipientAddress ? '✅' : '❌')
       });
     }
 
@@ -111,10 +117,12 @@ export const verifyTransaction = async (
         intent: displayAmount(originalIntent.amount),
         apiResponse: displayAmount(transactionEncodeResponse.transaction.data.amount),
         decoded: hasRealDecoding ?
-          ((verificationResult.decodedData?.transaction as any)?.amount ? 
-            displayAmount((verificationResult.decodedData?.transaction as any).amount) : 'N/A')
+          ((verificationResult.decodedData?.raw as any)?.amount ? 
+            displayAmount((verificationResult.decodedData?.raw as any).amount) : 'N/A')
           : 'Not decoded',
-        status: originalIntent.amount === transactionEncodeResponse.transaction.data.amount ? '✅' : '❌'
+        status: hasRealDecoding ?
+        (originalIntent.amount === (verificationResult.decodedData?.raw as any)?.amount ? '✅' : '❌') :
+        (originalIntent.amount === transactionEncodeResponse.transaction.data.amount ? '✅' : '❌')
       });
     }
 
