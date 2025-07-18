@@ -24,6 +24,7 @@ Adamik Link integrates the open-source [Adamik SDK](https://github.com/Adamik-SD
 The SDK performs two levels of verification:
 
 1. **Intent Validation** - Verifies that the API response matches your original request:
+
    - Transaction mode (transfer, stake, etc.)
    - Sender and recipient addresses
    - Transfer amounts
@@ -38,12 +39,14 @@ The SDK performs two levels of verification:
 ### Verification Display
 
 After encoding a transaction, you'll see a comprehensive verification report in table format:
+
 - Chain information and verification level
 - Field-by-field comparison of your intent vs API response vs decoded data
 - Clear ✅/❌ status indicators for each field
 - Warnings for chains with partial verification support
 
 This verification step helps protect against:
+
 - Malicious API responses
 - Address tampering
 - Amount manipulation
