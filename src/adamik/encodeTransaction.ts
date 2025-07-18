@@ -438,6 +438,7 @@ export const encodeTransaction = async ({
     infoTerminal("========================================");
     
   } catch (error) {
+    console.error("DEBUG: SDK verification error:", error);
     // If it's our verification error, re-throw it
     if (error instanceof Error && error.message.includes("verification failed")) {
       throw error;
