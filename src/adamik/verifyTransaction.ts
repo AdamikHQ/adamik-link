@@ -108,8 +108,7 @@ export const verifyTransaction = async (
     // Add validator row for staking transactions
     if (originalIntent.targetValidatorAddress || originalIntent.validatorAddress) {
       const intentValidator = originalIntent.targetValidatorAddress || originalIntent.validatorAddress;
-      const apiValidator = transactionEncodeResponse.transaction.data.targetValidatorAddress || 
-                          transactionEncodeResponse.transaction.data.validatorAddress;
+      const apiValidator = transactionEncodeResponse.transaction.data.targetValidatorAddress;
       const decodedValidator = hasRealDecoding ? 
         ((verificationResult.decodedData?.transaction as any)?.targetValidatorAddress || 
          (verificationResult.decodedData?.transaction as any)?.validatorAddress) : null;
