@@ -33,16 +33,18 @@ export const verifyTransaction = async (
   originalIntent: OriginalIntent,
   chain: AdamikChain
 ): Promise<void> => {
-  infoTerminal("========================================");
   infoTerminal("🔍 Verifying Transaction Data...", "Adamik SDK");
-  infoTerminal("📖 Powered by open-source Adamik SDK (github.com/Adamik-SDK/adamik-sdk)", "Adamik SDK");
+  infoTerminal(
+    "📖 Powered by open-source Adamik SDK (github.com/Adamik-SDK/adamik-sdk)",
+    "Adamik SDK"
+  );
 
   try {
     const sdk = new AdamikSDK();
-    
+
     // Remove status field and convert to SDK expected format
     const { status, ...apiResponseForSDK } = transactionEncodeResponse;
-    
+
     // Perform verification
     const verificationResult = await sdk.verify(
       apiResponseForSDK as any,
@@ -51,78 +53,128 @@ export const verifyTransaction = async (
 
     // Create verification table
     const table = new Table({
-      head: ['Field', 'Your Intent', 'API Response', 'Decoded Value', 'Status'],
+      head: ["Field", "Your Intent", "API Response", "Decoded Value", "Status"],
       colWidths: [15, 25, 25, 25, 10],
-      style: { head: ['cyan'] }
+      style: { head: ["cyan"] },
     });
 
     const rows: VerificationTableRow[] = [];
-    
+
     // Check if we have real decoded data or just placeholder/missing decoder
-    const hasRealDecoding = verificationResult.decodedData && 
-      !(verificationResult.warnings?.some((w: any) => 
-        w.message.includes('placeholder decoder') || 
-        w.message.includes('No decoder available')));
+    const hasRealDecoding =
+      verificationResult.decodedData &&
+      !verificationResult.warnings?.some(
+        (w: any) =>
+          w.message.includes("placeholder decoder") ||
+          w.message.includes("No decoder available")
+      );
 
     // Add mode row
     rows.push({
-      field: 'Mode',
+      field: "Mode",
       intent: originalIntent.mode,
       apiResponse: transactionEncodeResponse.transaction.data.mode,
-      decoded: hasRealDecoding ? ((verificationResult.decodedData?.raw as any)?.mode || 'N/A') : 'Not decoded',
-      status: hasRealDecoding ? 
-        (originalIntent.mode === (verificationResult.decodedData?.raw as any)?.mode ? '✅' : '❌') :
-        (originalIntent.mode === transactionEncodeResponse.transaction.data.mode ? '✅' : '❌')
+      decoded: hasRealDecoding
+        ? (verificationResult.decodedData?.raw as any)?.mode || "N/A"
+        : "Not decoded",
+      status: hasRealDecoding
+        ? originalIntent.mode ===
+          (verificationResult.decodedData?.raw as any)?.mode
+          ? "✅"
+          : "❌"
+        : originalIntent.mode ===
+          transactionEncodeResponse.transaction.data.mode
+        ? "✅"
+        : "❌",
     });
 
     // Add sender row
     rows.push({
-      field: 'Sender',
-      intent: originalIntent.senderAddress?.slice(0, 20) + '...',
-      apiResponse: transactionEncodeResponse.transaction.data.senderAddress?.slice(0, 20) + '...',
-      decoded: hasRealDecoding ? 
-        ((verificationResult.decodedData?.raw as any)?.senderAddress ? 
-          (verificationResult.decodedData?.raw as any).senderAddress.slice(0, 20) + '...' : 'N/A') 
-        : 'Not decoded',
-      status: hasRealDecoding ?
-        (originalIntent.senderAddress === (verificationResult.decodedData?.raw as any)?.senderAddress ? '✅' : '❌') :
-        (originalIntent.senderAddress === transactionEncodeResponse.transaction.data.senderAddress ? '✅' : '❌')
+      field: "Sender",
+      intent: originalIntent.senderAddress?.slice(0, 20) + "...",
+      apiResponse:
+        transactionEncodeResponse.transaction.data.senderAddress?.slice(0, 20) +
+        "...",
+      decoded: hasRealDecoding
+        ? (verificationResult.decodedData?.raw as any)?.senderAddress
+          ? (verificationResult.decodedData?.raw as any).senderAddress.slice(
+              0,
+              20
+            ) + "..."
+          : "N/A"
+        : "Not decoded",
+      status: hasRealDecoding
+        ? originalIntent.senderAddress ===
+          (verificationResult.decodedData?.raw as any)?.senderAddress
+          ? "✅"
+          : "❌"
+        : originalIntent.senderAddress ===
+          transactionEncodeResponse.transaction.data.senderAddress
+        ? "✅"
+        : "❌",
     });
 
     // Add recipient row if applicable
     if (originalIntent.recipientAddress) {
       rows.push({
-        field: 'Recipient',
-        intent: originalIntent.recipientAddress.slice(0, 20) + '...',
-        apiResponse: transactionEncodeResponse.transaction.data.recipientAddress?.slice(0, 20) + '...' || 'N/A',
-        decoded: hasRealDecoding ?
-          ((verificationResult.decodedData?.raw as any)?.recipientAddress ? 
-            (verificationResult.decodedData?.raw as any).recipientAddress.slice(0, 20) + '...' : 'N/A')
-          : 'Not decoded',
-        status: hasRealDecoding ?
-        (originalIntent.recipientAddress === (verificationResult.decodedData?.raw as any)?.recipientAddress ? '✅' : '❌') :
-        (originalIntent.recipientAddress === transactionEncodeResponse.transaction.data.recipientAddress ? '✅' : '❌')
+        field: "Recipient",
+        intent: originalIntent.recipientAddress.slice(0, 20) + "...",
+        apiResponse:
+          transactionEncodeResponse.transaction.data.recipientAddress?.slice(
+            0,
+            20
+          ) + "..." || "N/A",
+        decoded: hasRealDecoding
+          ? (verificationResult.decodedData?.raw as any)?.recipientAddress
+            ? (
+                verificationResult.decodedData?.raw as any
+              ).recipientAddress.slice(0, 20) + "..."
+            : "N/A"
+          : "Not decoded",
+        status: hasRealDecoding
+          ? originalIntent.recipientAddress ===
+            (verificationResult.decodedData?.raw as any)?.recipientAddress
+            ? "✅"
+            : "❌"
+          : originalIntent.recipientAddress ===
+            transactionEncodeResponse.transaction.data.recipientAddress
+          ? "✅"
+          : "❌",
       });
     }
 
     // Add validator row for staking transactions
-    if (originalIntent.targetValidatorAddress || originalIntent.validatorAddress) {
-      const intentValidator = originalIntent.targetValidatorAddress || originalIntent.validatorAddress;
-      const apiValidator = transactionEncodeResponse.transaction.data.targetValidatorAddress;
-      const decodedValidator = hasRealDecoding ? 
-        ((verificationResult.decodedData?.transaction as any)?.targetValidatorAddress || 
-         (verificationResult.decodedData?.transaction as any)?.validatorAddress) : null;
+    if (
+      originalIntent.targetValidatorAddress ||
+      originalIntent.validatorAddress
+    ) {
+      const intentValidator =
+        originalIntent.targetValidatorAddress ||
+        originalIntent.validatorAddress;
+      const apiValidator =
+        transactionEncodeResponse.transaction.data.targetValidatorAddress;
+      const decodedValidator = hasRealDecoding
+        ? (verificationResult.decodedData?.transaction as any)
+            ?.targetValidatorAddress ||
+          (verificationResult.decodedData?.transaction as any)?.validatorAddress
+        : null;
 
       rows.push({
-        field: 'Validator',
-        intent: intentValidator?.slice(0, 20) + '...',
-        apiResponse: apiValidator?.slice(0, 20) + '...' || 'N/A',
-        decoded: hasRealDecoding ?
-          (decodedValidator ? decodedValidator.slice(0, 20) + '...' : 'N/A')
-          : 'Not decoded',
-        status: hasRealDecoding ?
-          (intentValidator === decodedValidator ? '✅' : '❌') :
-          (intentValidator === apiValidator ? '✅' : '❌')
+        field: "Validator",
+        intent: intentValidator?.slice(0, 20) + "...",
+        apiResponse: apiValidator?.slice(0, 20) + "..." || "N/A",
+        decoded: hasRealDecoding
+          ? decodedValidator
+            ? decodedValidator.slice(0, 20) + "..."
+            : "N/A"
+          : "Not decoded",
+        status: hasRealDecoding
+          ? intentValidator === decodedValidator
+            ? "✅"
+            : "❌"
+          : intentValidator === apiValidator
+          ? "✅"
+          : "❌",
       });
     }
 
@@ -134,56 +186,97 @@ export const verifyTransaction = async (
       };
 
       rows.push({
-        field: 'Amount',
+        field: "Amount",
         intent: displayAmount(originalIntent.amount),
-        apiResponse: displayAmount(transactionEncodeResponse.transaction.data.amount),
-        decoded: hasRealDecoding ?
-          ((verificationResult.decodedData?.raw as any)?.amount ? 
-            displayAmount((verificationResult.decodedData?.raw as any).amount) : 'N/A')
-          : 'Not decoded',
-        status: hasRealDecoding ?
-        (originalIntent.amount === (verificationResult.decodedData?.raw as any)?.amount ? '✅' : '❌') :
-        (originalIntent.amount === transactionEncodeResponse.transaction.data.amount ? '✅' : '❌')
+        apiResponse: displayAmount(
+          transactionEncodeResponse.transaction.data.amount
+        ),
+        decoded: hasRealDecoding
+          ? (verificationResult.decodedData?.raw as any)?.amount
+            ? displayAmount((verificationResult.decodedData?.raw as any).amount)
+            : "N/A"
+          : "Not decoded",
+        status: hasRealDecoding
+          ? originalIntent.amount ===
+            (verificationResult.decodedData?.raw as any)?.amount
+            ? "✅"
+            : "❌"
+          : originalIntent.amount ===
+            transactionEncodeResponse.transaction.data.amount
+          ? "✅"
+          : "❌",
       });
     }
 
     // Add token row if applicable
     if (originalIntent.tokenId) {
       rows.push({
-        field: 'Token',
-        intent: originalIntent.tokenId.slice(0, 20) + '...',
-        apiResponse: transactionEncodeResponse.transaction.data.tokenId?.slice(0, 20) + '...' || 'N/A',
-        decoded: hasRealDecoding ?
-          ((verificationResult.decodedData?.transaction as any)?.tokenId ? 
-            (verificationResult.decodedData?.transaction as any).tokenId.slice(0, 20) + '...' : 'N/A')
-          : 'Not decoded',
-        status: originalIntent.tokenId === transactionEncodeResponse.transaction.data.tokenId ? '✅' : '❌'
+        field: "Token",
+        intent: originalIntent.tokenId.slice(0, 20) + "...",
+        apiResponse:
+          transactionEncodeResponse.transaction.data.tokenId?.slice(0, 20) +
+            "..." || "N/A",
+        decoded: hasRealDecoding
+          ? (verificationResult.decodedData?.transaction as any)?.tokenId
+            ? (
+                verificationResult.decodedData?.transaction as any
+              ).tokenId.slice(0, 20) + "..."
+            : "N/A"
+          : "Not decoded",
+        status:
+          originalIntent.tokenId ===
+          transactionEncodeResponse.transaction.data.tokenId
+            ? "✅"
+            : "❌",
       });
     }
 
     // Add rows to table
-    rows.forEach(row => {
-      table.push([row.field, row.intent, row.apiResponse, row.decoded, row.status]);
+    rows.forEach((row) => {
+      table.push([
+        row.field,
+        row.intent,
+        row.apiResponse,
+        row.decoded,
+        row.status,
+      ]);
     });
 
     // Display chain information
     infoTerminal("\n🔗 Chain Information:", "Verification");
     const chainTable = new Table({
-      head: ['Property', 'Value'],
+      head: ["Property", "Value"],
       colWidths: [30, 50],
-      style: { head: ['cyan'] }
+      style: { head: ["cyan"] },
     });
 
-    const encodedFormat = transactionEncodeResponse.transaction.encoded?.[0]?.raw?.format || "Unknown";
-    const fullProtectionChains = ["ethereum", "sepolia", "polygon", "bsc", "avalanche", "arbitrum", "optimism", "base", "bitcoin", "bitcoin-testnet", "cosmoshub", "celestia", "injective", "babylon-testnet"];
+    const encodedFormat =
+      transactionEncodeResponse.transaction.encoded?.[0]?.raw?.format ||
+      "Unknown";
+    const fullProtectionChains = [
+      "ethereum",
+      "sepolia",
+      "polygon",
+      "bsc",
+      "avalanche",
+      "arbitrum",
+      "optimism",
+      "base",
+      "bitcoin",
+      "bitcoin-testnet",
+      "cosmoshub",
+      "celestia",
+      "injective",
+      "babylon-testnet",
+    ];
     const isFullProtection = fullProtectionChains.includes(chain.id);
 
     chainTable.push(
-      ['Chain', `${chain.name} (${chain.id})`],
-      ['Transaction Format', encodedFormat],
-      ['Verification Level', isFullProtection ? 'COMPLETE' : 'PARTIAL'],
-      ['Intent Validation', 'Enabled'],
-      ['Encoded Validation', isFullProtection ? 'Enabled' : 'Not Available']
+      ["Chain", `${chain.name} (${chain.id})`],
+      ["Transaction Format", encodedFormat],
+      ["Verification Level", isFullProtection ? "COMPLETE" : "PARTIAL"],
+      ["Intent Validation", "Enabled"],
+      ["Encoded Validation", isFullProtection ? "Enabled" : "Not Available"]
     );
 
     console.log(chainTable.toString());
@@ -195,14 +288,17 @@ export const verifyTransaction = async (
     // Display overall status
     if (!verificationResult.isValid) {
       errorTerminal("\n❌ VERIFICATION FAILED", "Verification");
-      
-      if (verificationResult.criticalErrors && verificationResult.criticalErrors.length > 0) {
+
+      if (
+        verificationResult.criticalErrors &&
+        verificationResult.criticalErrors.length > 0
+      ) {
         errorTerminal("\n💀 CRITICAL ISSUES:", "Verification");
         verificationResult.criticalErrors.forEach((error: any) => {
           errorTerminal(`  • ${error.code}: ${error.message}`, "Verification");
         });
       }
-      
+
       if (verificationResult.errors && verificationResult.errors.length > 0) {
         errorTerminal("\n❌ ERRORS:", "Verification");
         verificationResult.errors.forEach((error: any) => {
@@ -210,26 +306,44 @@ export const verifyTransaction = async (
         });
       }
 
-      throw new Error("Transaction verification failed - transaction data does not match your original request");
+      throw new Error(
+        "Transaction verification failed - transaction data does not match your original request"
+      );
     } else {
       // Check if we have warnings about missing decoders
-      const hasDecoderWarnings = verificationResult.warnings?.some((w: any) => 
-        w.message.includes('placeholder decoder') || 
-        w.message.includes('No decoder available')
+      const hasDecoderWarnings = verificationResult.warnings?.some(
+        (w: any) =>
+          w.message.includes("placeholder decoder") ||
+          w.message.includes("No decoder available")
       );
-      
+
       if (hasDecoderWarnings) {
-        warningTerminal("\n⚠️ PARTIAL VERIFICATION - Intent validated but encoded transaction could not be decoded", "Verification");
+        warningTerminal(
+          "\n⚠️ PARTIAL VERIFICATION - Intent validated but encoded transaction could not be decoded",
+          "Verification"
+        );
       } else {
-        successInfoTerminal("\n✅ VERIFICATION SUCCESSFUL - Transaction data matches your intent", "Verification");
+        successInfoTerminal(
+          "\n✅ VERIFICATION SUCCESSFUL - Transaction data matches your intent",
+          "Verification"
+        );
       }
-      
-      if (verificationResult.warnings && verificationResult.warnings.length > 0) {
+
+      if (
+        verificationResult.warnings &&
+        verificationResult.warnings.length > 0
+      ) {
         warningTerminal("\n⚠️ Warnings:", "Verification");
         verificationResult.warnings.forEach((warning: any) => {
           // Improve the decoder warning messages
-          if (warning.message.includes('placeholder decoder') || warning.message.includes('No decoder available')) {
-            warningTerminal(`  • Adamik SDK does not yet have a decoder for this chain - only intent validation performed`, "Verification");
+          if (
+            warning.message.includes("placeholder decoder") ||
+            warning.message.includes("No decoder available")
+          ) {
+            warningTerminal(
+              `  • Adamik SDK does not yet have a decoder for this chain - only intent validation performed`,
+              "Verification"
+            );
           } else {
             warningTerminal(`  • ${warning.message}`, "Verification");
           }
@@ -238,14 +352,19 @@ export const verifyTransaction = async (
     }
 
     // Note: Fees are not available in the transaction data at this point
-
   } catch (error) {
-    if (error instanceof Error && error.message.includes("verification failed")) {
+    if (
+      error instanceof Error &&
+      error.message.includes("verification failed")
+    ) {
       throw error;
     }
-    
+
     warningTerminal(`\n⚠️ SDK verification error: ${error}`, "Verification");
-    warningTerminal("Proceeding with caution - manual verification recommended", "Verification");
+    warningTerminal(
+      "Proceeding with caution - manual verification recommended",
+      "Verification"
+    );
   }
 
   infoTerminal("========================================");
