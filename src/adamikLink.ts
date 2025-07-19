@@ -130,6 +130,7 @@ export const adamikLink = async () => {
     amount: transactionEncodeResponse.transaction.data.amount,
     tokenId: transactionEncodeResponse.transaction.data.tokenId,
     targetValidatorAddress: transactionEncodeResponse.transaction.data.targetValidatorAddress,
+    validatorAddress: transactionEncodeResponse.transaction.data.validatorAddress,
     senderPubKey: pubkey,
   };
 

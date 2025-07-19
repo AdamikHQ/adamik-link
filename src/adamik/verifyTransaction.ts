@@ -42,6 +42,27 @@ export const verifyTransaction = async (
   try {
     const sdk = new AdamikSDK();
 
+    // First, decode the transaction independently to get decoded values
+    let independentDecodedData: any = null;
+    let hasIndependentDecoding = false;
+    
+    if (transactionEncodeResponse.transaction.encoded?.[0]?.raw) {
+      try {
+        const decodeResult = await (sdk as any).decode({
+          chainId: transactionEncodeResponse.chainId,
+          format: transactionEncodeResponse.transaction.encoded[0].raw.format,
+          encodedData: transactionEncodeResponse.transaction.encoded[0].raw.value
+        });
+
+        if (decodeResult.decoded && !decodeResult.isPlaceholder) {
+          independentDecodedData = decodeResult.decoded;
+          hasIndependentDecoding = true;
+        }
+      } catch (decodeError) {
+        // If decode fails, we'll fall back to verification result
+      }
+    }
+
     // Remove status field and convert to SDK expected format
     const { status, ...apiResponseForSDK } = transactionEncodeResponse;
 
@@ -60,14 +81,19 @@ export const verifyTransaction = async (
 
     const rows: VerificationTableRow[] = [];
 
-    // Check if we have real decoded data or just placeholder/missing decoder
-    const hasRealDecoding =
+    // Use independent decoding if available, otherwise fall back to verification result
+    const decodedData = hasIndependentDecoding 
+      ? independentDecodedData 
+      : verificationResult.decodedData?.raw;
+    
+    const hasRealDecoding = hasIndependentDecoding || (
       verificationResult.decodedData &&
       !verificationResult.warnings?.some(
         (w: any) =>
           w.message.includes("placeholder decoder") ||
           w.message.includes("No decoder available")
-      );
+      )
+    );
 
     // Add mode row
     rows.push({
@@ -75,11 +101,10 @@ export const verifyTransaction = async (
       intent: originalIntent.mode,
       apiResponse: transactionEncodeResponse.transaction.data.mode,
       decoded: hasRealDecoding
-        ? (verificationResult.decodedData?.raw as any)?.mode || "N/A"
+        ? decodedData?.mode || "N/A"
         : "Not decoded",
       status: hasRealDecoding
-        ? originalIntent.mode ===
-          (verificationResult.decodedData?.raw as any)?.mode
+        ? originalIntent.mode === decodedData?.mode
           ? "✅"
           : "❌"
         : originalIntent.mode ===
@@ -96,16 +121,12 @@ export const verifyTransaction = async (
         transactionEncodeResponse.transaction.data.senderAddress?.slice(0, 20) +
         "...",
       decoded: hasRealDecoding
-        ? (verificationResult.decodedData?.raw as any)?.senderAddress
-          ? (verificationResult.decodedData?.raw as any).senderAddress.slice(
-              0,
-              20
-            ) + "..."
+        ? decodedData?.senderAddress
+          ? decodedData.senderAddress.slice(0, 20) + "..."
           : "N/A"
         : "Not decoded",
       status: hasRealDecoding
-        ? originalIntent.senderAddress ===
-          (verificationResult.decodedData?.raw as any)?.senderAddress
+        ? originalIntent.senderAddress === decodedData?.senderAddress
           ? "✅"
           : "❌"
         : originalIntent.senderAddress ===
@@ -125,15 +146,12 @@ export const verifyTransaction = async (
             20
           ) + "..." || "N/A",
         decoded: hasRealDecoding
-          ? (verificationResult.decodedData?.raw as any)?.recipientAddress
-            ? (
-                verificationResult.decodedData?.raw as any
-              ).recipientAddress.slice(0, 20) + "..."
+          ? decodedData?.recipientAddress
+            ? decodedData.recipientAddress.slice(0, 20) + "..."
             : "N/A"
           : "Not decoded",
         status: hasRealDecoding
-          ? originalIntent.recipientAddress ===
-            (verificationResult.decodedData?.raw as any)?.recipientAddress
+          ? originalIntent.recipientAddress === decodedData?.recipientAddress
             ? "✅"
             : "❌"
           : originalIntent.recipientAddress ===
@@ -152,11 +170,10 @@ export const verifyTransaction = async (
         originalIntent.targetValidatorAddress ||
         originalIntent.validatorAddress;
       const apiValidator =
-        transactionEncodeResponse.transaction.data.targetValidatorAddress;
+        transactionEncodeResponse.transaction.data.targetValidatorAddress ||
+        transactionEncodeResponse.transaction.data.validatorAddress;
       const decodedValidator = hasRealDecoding
-        ? (verificationResult.decodedData?.transaction as any)
-            ?.targetValidatorAddress ||
-          (verificationResult.decodedData?.transaction as any)?.validatorAddress
+        ? decodedData?.targetValidatorAddress || decodedData?.validatorAddress
         : null;
 
       rows.push({
@@ -192,13 +209,12 @@ export const verifyTransaction = async (
           transactionEncodeResponse.transaction.data.amount
         ),
         decoded: hasRealDecoding
-          ? (verificationResult.decodedData?.raw as any)?.amount
-            ? displayAmount((verificationResult.decodedData?.raw as any).amount)
+          ? decodedData?.amount
+            ? displayAmount(decodedData.amount)
             : "N/A"
           : "Not decoded",
         status: hasRealDecoding
-          ? originalIntent.amount ===
-            (verificationResult.decodedData?.raw as any)?.amount
+          ? originalIntent.amount === decodedData?.amount
             ? "✅"
             : "❌"
           : originalIntent.amount ===
@@ -217,10 +233,8 @@ export const verifyTransaction = async (
           transactionEncodeResponse.transaction.data.tokenId?.slice(0, 20) +
             "..." || "N/A",
         decoded: hasRealDecoding
-          ? (verificationResult.decodedData?.transaction as any)?.tokenId
-            ? (
-                verificationResult.decodedData?.transaction as any
-              ).tokenId.slice(0, 20) + "..."
+          ? decodedData?.tokenId
+            ? decodedData.tokenId.slice(0, 20) + "..."
             : "N/A"
           : "Not decoded",
         status:
@@ -297,7 +311,7 @@ export const verifyTransaction = async (
     const isEVM = evmChains.includes(chain.id);
     const hasMissingSender =
       hasRealDecoding &&
-      !(verificationResult.decodedData?.raw as any)?.senderAddress &&
+      !decodedData?.senderAddress &&
       originalIntent.senderAddress;
 
     if (isEVM && hasMissingSender) {
