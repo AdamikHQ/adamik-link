@@ -285,6 +285,28 @@ export const verifyTransaction = async (
     infoTerminal("\n📊 Verification Results:", "Verification");
     console.log(table.toString());
 
+    // Check if this is an EVM chain with missing sender in decoded data
+    const evmChains = [
+      "ethereum",
+      "polygon",
+      "bsc",
+      "avalanche",
+      "arbitrum",
+      "optimism",
+    ];
+    const isEVM = evmChains.includes(chain.id);
+    const hasMissingSender =
+      hasRealDecoding &&
+      !(verificationResult.decodedData?.raw as any)?.senderAddress &&
+      originalIntent.senderAddress;
+
+    if (isEVM && hasMissingSender) {
+      warningTerminal(
+        "\n⚠️  Note: Sender address validated against intent but cannot be decoded from unsigned EVM transactions",
+        "Verification"
+      );
+    }
+
     // Display overall status
     if (!verificationResult.isValid) {
       errorTerminal("\n❌ VERIFICATION FAILED", "Verification");
