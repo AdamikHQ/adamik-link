@@ -114,6 +114,30 @@ export const successTerminal = (message: string, source?: string) => {
   console.log(picocolors.bgGreen(`[${source?.toUpperCase()}] ${message}`));
 };
 
+export const successInfoTerminal = (message: string, source?: string) => {
+  if (source) {
+    console.log(
+      `${picocolors.bold(`[${source.toUpperCase()}]`)} ${picocolors.green(
+        `${message}`
+      )}`
+    );
+  } else {
+    console.log(`${picocolors.green(`${message}`)}`);
+  }
+};
+
+export const warningTerminal = (message: string, source?: string) => {
+  if (source) {
+    console.log(
+      `${picocolors.bold(`[${source.toUpperCase()}]`)} ${picocolors.yellow(
+        `${message}`
+      )}`
+    );
+  } else {
+    console.log(`${picocolors.yellow(`${message}`)}`);
+  }
+};
+
 export const italicInfoTerminal = async (message: string, delayMs = 60) => {
   // Split the stringified JSON by newlines
   const lines = message.split("\n");

@@ -3,6 +3,9 @@ import {
   amountToSmallestUnit,
   errorTerminal,
   infoTerminal,
+  italicInfoTerminal,
+  successInfoTerminal,
+  warningTerminal,
   overridedPrompt,
 } from "../utils";
 import { deployAccount } from "./deployAccount";
@@ -13,7 +16,8 @@ import {
   AdamikTransactionEncodeRequest,
   AdamikTransactionEncodeResponse,
 } from "./types";
-import { Choice } from 'prompts';
+import { Choice } from "prompts";
+import AdamikSDK from "adamik-sdk";
 
 export const encodeTransaction = async ({
   chain,
@@ -272,6 +276,9 @@ export const encodeTransaction = async ({
       "Transaction encoding failed"
     );
   }
+
+  // Return the transaction response without verification here
+  // Verification will be done in adamikLink.ts after displaying transaction details
 
   return transactionEncodeResponse;
 };

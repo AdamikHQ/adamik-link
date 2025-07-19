@@ -8,11 +8,49 @@ A TypeScript-based CLI tool for interacting with Adamik. This tool allows you to
 - Get chain information
 - Retrieve account balances (native and tokens)
 - Encode and sign transactions
+- **Transaction verification powered by [Adamik SDK](https://github.com/Adamik-SDK/adamik-sdk)**
 - Broadcast signed transactions
 - Support for multiple signing providers:
   - Dfns
   - Sodot
   - Turnkey
+
+## Transaction Security & Verification
+
+Adamik Link integrates the open-source [Adamik SDK](https://github.com/Adamik-SDK/adamik-sdk) to provide comprehensive transaction verification before signing. This ensures that the transaction you're about to sign matches exactly what you intended.
+
+### What is Verified?
+
+The SDK performs two levels of verification:
+
+1. **Intent Validation** - Verifies that the API response matches your original request:
+
+   - Transaction mode (transfer, stake, etc.)
+   - Sender and recipient addresses
+   - Transfer amounts
+   - Token contracts (for token transfers)
+   - Validator addresses (for staking operations)
+
+2. **Encoded Validation** - Decodes the actual transaction bytes to ensure they match the API response:
+   - Available for: Ethereum, Polygon, BSC, Bitcoin, Cosmos, and other major chains
+   - Cryptographically verifies the encoded transaction data
+   - Detects any tampering or mismatches between displayed and actual transaction data
+
+### Verification Display
+
+After encoding a transaction, you'll see a comprehensive verification report in table format:
+
+- Chain information and verification level
+- Field-by-field comparison of your intent vs API response vs decoded data
+- Clear ✅/❌ status indicators for each field
+- Warnings for chains with partial verification support
+
+This verification step helps protect against:
+
+- Malicious API responses
+- Address tampering
+- Amount manipulation
+- Transaction type confusion attacks
 
 ## Prerequisites
 

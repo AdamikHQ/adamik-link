@@ -115,6 +115,7 @@ export type AdamikTransactionEncodeResponse = {
       senderPubKey?: string;
       recipientAddress?: string;
       targetValidatorAddress?: string;
+      validatorAddress?: string;
       tokenId?: string;
       amount: string;
       useMaxAmount?: boolean;

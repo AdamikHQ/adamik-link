@@ -1,0 +1,407 @@
+import AdamikSDK from "adamik-sdk";
+import Table from "cli-table3";
+import {
+  errorTerminal,
+  infoTerminal,
+  successInfoTerminal,
+  warningTerminal,
+} from "../utils";
+import { AdamikTransactionEncodeResponse, AdamikChain } from "./types";
+
+export interface VerificationTableRow {
+  field: string;
+  intent: string;
+  apiResponse: string;
+  decoded?: string;
+  status: "✅" | "❌" | "⚠️";
+}
+
+interface OriginalIntent {
+  mode: string;
+  senderAddress: string;
+  recipientAddress?: string;
+  amount?: string;
+  tokenId?: string;
+  validatorAddress?: string;
+  targetValidatorAddress?: string;
+  stakeId?: string;
+  senderPubKey?: string;
+}
+
+export const verifyTransaction = async (
+  transactionEncodeResponse: AdamikTransactionEncodeResponse,
+  originalIntent: OriginalIntent,
+  chain: AdamikChain
+): Promise<void> => {
+  infoTerminal("🔍 Verifying Transaction Data...", "Adamik SDK");
+  infoTerminal(
+    "📖 Powered by open-source Adamik SDK (github.com/Adamik-SDK/adamik-sdk)",
+    "Adamik SDK"
+  );
+
+  try {
+    const sdk = new AdamikSDK();
+
+    // First, decode the transaction independently to get decoded values
+    let independentDecodedData: any = null;
+    let hasIndependentDecoding = false;
+    
+    if (transactionEncodeResponse.transaction.encoded?.[0]?.raw) {
+      try {
+        const decodeResult = await (sdk as any).decode({
+          chainId: transactionEncodeResponse.chainId,
+          format: transactionEncodeResponse.transaction.encoded[0].raw.format,
+          encodedData: transactionEncodeResponse.transaction.encoded[0].raw.value
+        });
+
+        if (decodeResult.decoded && !decodeResult.isPlaceholder) {
+          independentDecodedData = decodeResult.decoded;
+          hasIndependentDecoding = true;
+        }
+      } catch (decodeError) {
+        // If decode fails, we'll fall back to verification result
+      }
+    }
+
+    // Remove status field and convert to SDK expected format
+    const { status, ...apiResponseForSDK } = transactionEncodeResponse;
+
+    // Perform verification
+    const verificationResult = await sdk.verify(
+      apiResponseForSDK as any,
+      originalIntent as any
+    );
+
+    // Create verification table
+    const table = new Table({
+      head: ["Field", "Your Intent", "API Response", "Decoded Value", "Status"],
+      colWidths: [15, 25, 25, 25, 10],
+      style: { head: ["cyan"] },
+    });
+
+    const rows: VerificationTableRow[] = [];
+
+    // Use independent decoding if available, otherwise fall back to verification result
+    const decodedData = hasIndependentDecoding 
+      ? independentDecodedData 
+      : verificationResult.decodedData?.raw;
+    
+    const hasRealDecoding = hasIndependentDecoding || (
+      verificationResult.decodedData &&
+      !verificationResult.warnings?.some(
+        (w: any) =>
+          w.message.includes("placeholder decoder") ||
+          w.message.includes("No decoder available")
+      )
+    );
+
+    // Add mode row
+    rows.push({
+      field: "Mode",
+      intent: originalIntent.mode,
+      apiResponse: transactionEncodeResponse.transaction.data.mode,
+      decoded: hasRealDecoding
+        ? decodedData?.mode || "N/A"
+        : "Not decoded",
+      status: hasRealDecoding
+        ? originalIntent.mode === decodedData?.mode
+          ? "✅"
+          : "❌"
+        : originalIntent.mode ===
+          transactionEncodeResponse.transaction.data.mode
+        ? "✅"
+        : "❌",
+    });
+
+    // Add sender row
+    rows.push({
+      field: "Sender",
+      intent: originalIntent.senderAddress?.slice(0, 20) + "...",
+      apiResponse:
+        transactionEncodeResponse.transaction.data.senderAddress?.slice(0, 20) +
+        "...",
+      decoded: hasRealDecoding
+        ? decodedData?.senderAddress
+          ? decodedData.senderAddress.slice(0, 20) + "..."
+          : "N/A"
+        : "Not decoded",
+      status: hasRealDecoding
+        ? originalIntent.senderAddress === decodedData?.senderAddress
+          ? "✅"
+          : "❌"
+        : originalIntent.senderAddress ===
+          transactionEncodeResponse.transaction.data.senderAddress
+        ? "✅"
+        : "❌",
+    });
+
+    // Add recipient row if applicable
+    if (originalIntent.recipientAddress) {
+      rows.push({
+        field: "Recipient",
+        intent: originalIntent.recipientAddress.slice(0, 20) + "...",
+        apiResponse:
+          transactionEncodeResponse.transaction.data.recipientAddress?.slice(
+            0,
+            20
+          ) + "..." || "N/A",
+        decoded: hasRealDecoding
+          ? decodedData?.recipientAddress
+            ? decodedData.recipientAddress.slice(0, 20) + "..."
+            : "N/A"
+          : "Not decoded",
+        status: hasRealDecoding
+          ? originalIntent.recipientAddress === decodedData?.recipientAddress
+            ? "✅"
+            : "❌"
+          : originalIntent.recipientAddress ===
+            transactionEncodeResponse.transaction.data.recipientAddress
+          ? "✅"
+          : "❌",
+      });
+    }
+
+    // Add validator row for staking transactions
+    if (
+      originalIntent.targetValidatorAddress ||
+      originalIntent.validatorAddress
+    ) {
+      const intentValidator =
+        originalIntent.targetValidatorAddress ||
+        originalIntent.validatorAddress;
+      const apiValidator =
+        transactionEncodeResponse.transaction.data.targetValidatorAddress ||
+        transactionEncodeResponse.transaction.data.validatorAddress;
+      const decodedValidator = hasRealDecoding
+        ? decodedData?.targetValidatorAddress || decodedData?.validatorAddress
+        : null;
+
+      rows.push({
+        field: "Validator",
+        intent: intentValidator?.slice(0, 20) + "...",
+        apiResponse: apiValidator?.slice(0, 20) + "..." || "N/A",
+        decoded: hasRealDecoding
+          ? decodedValidator
+            ? decodedValidator.slice(0, 20) + "..."
+            : "N/A"
+          : "Not decoded",
+        status: hasRealDecoding
+          ? intentValidator === decodedValidator
+            ? "✅"
+            : "❌"
+          : intentValidator === apiValidator
+          ? "✅"
+          : "❌",
+      });
+    }
+
+    // Add amount row if applicable
+    if (originalIntent.amount) {
+      const displayAmount = (amount: string) => {
+        const mainUnit = Number(amount) / Math.pow(10, chain.decimals);
+        return `${mainUnit} ${chain.ticker}`;
+      };
+
+      rows.push({
+        field: "Amount",
+        intent: displayAmount(originalIntent.amount),
+        apiResponse: displayAmount(
+          transactionEncodeResponse.transaction.data.amount
+        ),
+        decoded: hasRealDecoding
+          ? decodedData?.amount
+            ? displayAmount(decodedData.amount)
+            : "N/A"
+          : "Not decoded",
+        status: hasRealDecoding
+          ? originalIntent.amount === decodedData?.amount
+            ? "✅"
+            : "❌"
+          : originalIntent.amount ===
+            transactionEncodeResponse.transaction.data.amount
+          ? "✅"
+          : "❌",
+      });
+    }
+
+    // Add token row if applicable
+    if (originalIntent.tokenId) {
+      rows.push({
+        field: "Token",
+        intent: originalIntent.tokenId.slice(0, 20) + "...",
+        apiResponse:
+          transactionEncodeResponse.transaction.data.tokenId?.slice(0, 20) +
+            "..." || "N/A",
+        decoded: hasRealDecoding
+          ? decodedData?.tokenId
+            ? decodedData.tokenId.slice(0, 20) + "..."
+            : "N/A"
+          : "Not decoded",
+        status:
+          originalIntent.tokenId ===
+          transactionEncodeResponse.transaction.data.tokenId
+            ? "✅"
+            : "❌",
+      });
+    }
+
+    // Add rows to table
+    rows.forEach((row) => {
+      table.push([
+        row.field,
+        row.intent,
+        row.apiResponse,
+        row.decoded,
+        row.status,
+      ]);
+    });
+
+    // Display chain information
+    infoTerminal("\n🔗 Chain Information:", "Verification");
+    const chainTable = new Table({
+      head: ["Property", "Value"],
+      colWidths: [30, 50],
+      style: { head: ["cyan"] },
+    });
+
+    const encodedFormat =
+      transactionEncodeResponse.transaction.encoded?.[0]?.raw?.format ||
+      "Unknown";
+    const fullProtectionChains = [
+      "ethereum",
+      "sepolia",
+      "polygon",
+      "bsc",
+      "avalanche",
+      "arbitrum",
+      "optimism",
+      "base",
+      "bitcoin",
+      "bitcoin-testnet",
+      "cosmoshub",
+      "celestia",
+      "injective",
+      "babylon-testnet",
+    ];
+    const isFullProtection = fullProtectionChains.includes(chain.id);
+
+    chainTable.push(
+      ["Chain", `${chain.name} (${chain.id})`],
+      ["Transaction Format", encodedFormat],
+      ["Verification Level", isFullProtection ? "COMPLETE" : "PARTIAL"],
+      ["Intent Validation", "Enabled"],
+      ["Encoded Validation", isFullProtection ? "Enabled" : "Not Available"]
+    );
+
+    console.log(chainTable.toString());
+
+    // Display verification results
+    infoTerminal("\n📊 Verification Results:", "Verification");
+    console.log(table.toString());
+
+    // Check if this is an EVM chain with missing sender in decoded data
+    const evmChains = [
+      "ethereum",
+      "polygon",
+      "bsc",
+      "avalanche",
+      "arbitrum",
+      "optimism",
+    ];
+    const isEVM = evmChains.includes(chain.id);
+    const hasMissingSender =
+      hasRealDecoding &&
+      !decodedData?.senderAddress &&
+      originalIntent.senderAddress;
+
+    if (isEVM && hasMissingSender) {
+      warningTerminal(
+        "\n⚠️  Note: Sender address validated against intent but cannot be decoded from unsigned EVM transactions",
+        "Verification"
+      );
+    }
+
+    // Display overall status
+    if (!verificationResult.isValid) {
+      errorTerminal("\n❌ VERIFICATION FAILED", "Verification");
+
+      if (
+        verificationResult.criticalErrors &&
+        verificationResult.criticalErrors.length > 0
+      ) {
+        errorTerminal("\n💀 CRITICAL ISSUES:", "Verification");
+        verificationResult.criticalErrors.forEach((error: any) => {
+          errorTerminal(`  • ${error.code}: ${error.message}`, "Verification");
+        });
+      }
+
+      if (verificationResult.errors && verificationResult.errors.length > 0) {
+        errorTerminal("\n❌ ERRORS:", "Verification");
+        verificationResult.errors.forEach((error: any) => {
+          errorTerminal(`  • ${error.code}: ${error.message}`, "Verification");
+        });
+      }
+
+      throw new Error(
+        "Transaction verification failed - transaction data does not match your original request"
+      );
+    } else {
+      // Check if we have warnings about missing decoders
+      const hasDecoderWarnings = verificationResult.warnings?.some(
+        (w: any) =>
+          w.message.includes("placeholder decoder") ||
+          w.message.includes("No decoder available")
+      );
+
+      if (hasDecoderWarnings) {
+        warningTerminal(
+          "\n⚠️ PARTIAL VERIFICATION - Intent validated but encoded transaction could not be decoded",
+          "Verification"
+        );
+      } else {
+        successInfoTerminal(
+          "\n✅ VERIFICATION SUCCESSFUL - Transaction data matches your intent",
+          "Verification"
+        );
+      }
+
+      if (
+        verificationResult.warnings &&
+        verificationResult.warnings.length > 0
+      ) {
+        warningTerminal("\n⚠️ Warnings:", "Verification");
+        verificationResult.warnings.forEach((warning: any) => {
+          // Improve the decoder warning messages
+          if (
+            warning.message.includes("placeholder decoder") ||
+            warning.message.includes("No decoder available")
+          ) {
+            warningTerminal(
+              `  • Adamik SDK does not yet have a decoder for this chain - only intent validation performed`,
+              "Verification"
+            );
+          } else {
+            warningTerminal(`  • ${warning.message}`, "Verification");
+          }
+        });
+      }
+    }
+
+    // Note: Fees are not available in the transaction data at this point
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("verification failed")
+    ) {
+      throw error;
+    }
+
+    warningTerminal(`\n⚠️ SDK verification error: ${error}`, "Verification");
+    warningTerminal(
+      "Proceeding with caution - manual verification recommended",
+      "Verification"
+    );
+  }
+
+  infoTerminal("========================================");
+};
