@@ -13,7 +13,7 @@ import {
   AdamikTransactionEncodeRequest,
   AdamikTransactionEncodeResponse,
 } from "./types";
-import { Choice } from 'prompts';
+import { Choice } from "prompts";
 
 export const encodeTransaction = async ({
   chain,
@@ -36,12 +36,16 @@ export const encodeTransaction = async ({
       {
         title: "Unstake",
         value: "unstake",
-        disabled: accountState.balances.staking === undefined || accountState.balances.staking.positions.length === 0
+        disabled:
+          accountState.balances.staking === undefined ||
+          accountState.balances.staking.positions.length === 0,
       },
       {
         title: "Withdraw",
         value: "withdraw",
-        disabled: accountState.balances.staking === undefined || accountState.balances.staking.positions.length === 0
+        disabled:
+          accountState.balances.staking === undefined ||
+          accountState.balances.staking.positions.length === 0,
       },
     ],
     initial: 0,
@@ -70,8 +74,7 @@ export const encodeTransaction = async ({
         });
 
         if (
-          chain.supportedFeatures.write.transaction.type.transferToken ===
-          true
+          chain.supportedFeatures.write.transaction.type.transferToken === true
         ) {
           accountState.balances.tokens.forEach((t) =>
             assetChoices.push({
@@ -96,12 +99,20 @@ export const encodeTransaction = async ({
         }
       }
       {
+        // Enforce default recipient address for TRX transfers
+        const defaultRecipient =
+          chain.id === "tron"
+            ? "TVKG4gUar24bpAVrDv4GSzyDRtPkjPkogL"
+            : senderAddress;
+
         const { recipientAddress } = await overridedPrompt({
           type: "text",
           name: "recipientAddress",
           message:
-            "What is the recipient address? (default is signer address)",
-          initial: senderAddress,
+            chain.id === "tron"
+              ? "Recipient address (default: TVKG4gUar24bpAVrDv4GSzyDRtPkjPkogL)"
+              : "What is the recipient address? (default is signer address)",
+          initial: defaultRecipient,
         });
 
         if (!recipientAddress) {
@@ -132,7 +143,10 @@ export const encodeTransaction = async ({
       const positions = accountState.balances.staking!.positions;
       requestBody.transaction.data.mode = "unstake";
       const choices: Choice[] = positions.map((position) => ({
-        title: `${position.validatorAddresses[0].slice(0, 6)}...${position.validatorAddresses[0].slice(-4)} (${amountToMainUnit(
+        title: `${position.validatorAddresses[0].slice(
+          0,
+          6
+        )}...${position.validatorAddresses[0].slice(-4)} (${amountToMainUnit(
           position.amount,
           chain.decimals
         )} ${chain.ticker})`,
@@ -160,7 +174,10 @@ export const encodeTransaction = async ({
       const positions = accountState.balances.staking!.positions;
       requestBody.transaction.data.mode = "withdraw";
       const choices: Choice[] = positions.map((position) => ({
-        title: `${position.validatorAddresses[0].slice(0, 6)}...${position.validatorAddresses[0].slice(-4)} (${amountToMainUnit(
+        title: `${position.validatorAddresses[0].slice(
+          0,
+          6
+        )}...${position.validatorAddresses[0].slice(-4)} (${amountToMainUnit(
           position.amount,
           chain.decimals
         )} ${chain.ticker})`,
@@ -189,7 +206,7 @@ export const encodeTransaction = async ({
       throw new Error("Unsupported transaction mode");
   }
 
-  const token = accountState.balances.tokens.find(
+  const token = accountState.balances.tokens?.find(
     (t) => t.token.id === requestBody.transaction.data.tokenId
   );
 
@@ -269,7 +286,7 @@ export const encodeTransaction = async ({
 
     throw new Error(
       transactionEncodeResponse.status.errors[0].message ||
-      "Transaction encoding failed"
+        "Transaction encoding failed"
     );
   }
 

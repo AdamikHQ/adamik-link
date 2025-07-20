@@ -6,12 +6,7 @@ import { encodeTransaction } from "./adamik/encodeTransaction";
 import { getAccountState } from "./adamik/getAccountState";
 import { adamikGetChains } from "./adamik/getChains";
 import { signerSelector } from "./signers";
-import {
-  errorTerminal,
-  infoTerminal,
-  italicInfoTerminal,
-  overridedPrompt,
-} from "./utils";
+import { errorTerminal, infoTerminal, italicInfoTerminal, overridedPrompt } from "./utils";
 import { displayBalance } from "./utils/displayBalance";
 import { transactionDetailView } from "./utils/displayTransaction";
 
@@ -44,22 +39,38 @@ export const adamikLink = async () => {
 
   infoTerminal("========================================");
 
-  infoTerminal(`Getting pubkey ...`, signer.signerName);
-  const pubkey = await signer.getPubkey();
-  infoTerminal(`Pubkey:`, signer.signerName);
-  await italicInfoTerminal(JSON.stringify(pubkey, null, 2));
+  let address: string;
+  let pubkey: string | undefined = undefined;
 
-  if (!pubkey) {
-    errorTerminal("Failed to get pubkey from signer", signer.signerName);
-    return;
+  try {
+    infoTerminal(`Getting pubkey from signer...`, signer.signerName);
+    pubkey = await signer.getPubkey();
+    infoTerminal(`Pubkey:`, signer.signerName);
+    await italicInfoTerminal(JSON.stringify(pubkey, null, 2));
+
+    if (!pubkey) {
+      throw new Error("Failed to get pubkey from signer");
+    }
+
+    infoTerminal("========================================");
+
+    infoTerminal(`Encoding pubkey to address ...`, "Adamik");
+    address = await encodePubKeyToAddress(pubkey, chainId);
+    infoTerminal(`Address:`, "Adamik");
+    await italicInfoTerminal(address);
+  } catch (error) {
+    infoTerminal(`Failed to get pubkey from signer`, signer.signerName);
+    infoTerminal(`Getting address from signer...`, signer.signerName);
+
+    try {
+      address = await signer.getAddress();
+      infoTerminal(`Address:`, signer.signerName);
+      await italicInfoTerminal(address);
+    } catch (signerError) {
+      errorTerminal(`Failed to get address from signer: ${signerError}`, signer.signerName);
+      return;
+    }
   }
-
-  infoTerminal("========================================");
-
-  infoTerminal(`Encoding pubkey to address ...`, "Adamik");
-  const address = await encodePubKeyToAddress(pubkey, chainId);
-  infoTerminal(`Address:`, "Adamik");
-  await italicInfoTerminal(address);
 
   infoTerminal("========================================");
 
@@ -77,12 +88,18 @@ export const adamikLink = async () => {
 
   infoTerminal(`We will now prepare an unsigned transaction ...`);
 
-  const { continueTransaction } = await overridedPrompt({
-    type: "confirm",
-    name: "continueTransaction",
-    message: "Do you want to continue? (No to restart)",
-    initial: true,
-  });
+  let continueTransaction;
+  try {
+    const result = await overridedPrompt({
+      type: "confirm",
+      name: "continueTransaction",
+      message: "Do you want to continue? (No to restart)",
+      initial: true,
+    });
+    continueTransaction = result.continueTransaction;
+  } catch (error) {
+    continueTransaction = true;
+  }
 
   if (!continueTransaction) {
     infoTerminal("Transaction cancelled. Restarting...");
@@ -110,13 +127,9 @@ export const adamikLink = async () => {
   );
   infoTerminal(`- Chain ID: ${transactionEncodeResponse.chainId}`, "Adamik");
   infoTerminal(`- Transaction data:`, "Adamik");
-  await italicInfoTerminal(
-    JSON.stringify(transactionEncodeResponse.transaction.data, null, 2)
-  );
+  await italicInfoTerminal(JSON.stringify(transactionEncodeResponse.transaction.data, null, 2));
   infoTerminal(`- Message to sign :`, "Adamik");
-  await italicInfoTerminal(
-    JSON.stringify(transactionEncodeResponse.transaction.encoded, null, 2)
-  );
+  await italicInfoTerminal(JSON.stringify(transactionEncodeResponse.transaction.encoded, null, 2));
 
   infoTerminal("========================================");
 
@@ -137,24 +150,30 @@ export const adamikLink = async () => {
     return;
   }
 
-  const choices = transactionEncodeResponse.transaction.encoded.reduce(
-    (acc, encoded) => {
-      if (encoded.hash) {
+  const choices = transactionEncodeResponse.transaction.encoded.reduce((acc, encoded, index) => {
+    try {
+      if (encoded?.hash) {
         acc.push({
           title: `Hash (${encoded.hash.format}) : ${encoded.hash.value}`,
           value: encoded.hash.format,
         });
       }
-      if (encoded.raw) {
+      if (encoded?.raw) {
         acc.push({
           title: `Raw (${encoded.raw.format}) : ${encoded.raw.value}`,
           value: encoded.raw.format,
         });
       }
-      return acc;
-    },
-    [] as { title: string; value: string }[]
-  );
+    } catch (error) {
+      // Skip invalid encoded objects
+    }
+    return acc;
+  }, [] as { title: string; value: string }[]);
+
+  if (choices.length === 0) {
+    errorTerminal("No valid signing choices found", "Adamik");
+    throw new Error("No valid signing formats available");
+  }
 
   const { toSign } = await overridedPrompt({
     type: "select",
@@ -180,10 +199,7 @@ export const adamikLink = async () => {
     return;
   }
 
-  infoTerminal(
-    `Signing ${isHashPayload ? "hash" : "transaction"} with ${toSign} ...`,
-    signer.signerName
-  );
+  infoTerminal(`Signing ${isHashPayload ? "hash" : "transaction"} with ${toSign} ...`, signer.signerName);
 
   const signature = isHashPayload
     ? await signer.signHash(isHashPayload)
@@ -214,11 +230,7 @@ export const adamikLink = async () => {
     )
   );
 
-  const broadcastResponse = await broadcastTransaction(
-    chainId,
-    transactionEncodeResponse,
-    signature
-  );
+  const broadcastResponse = await broadcastTransaction(chainId, transactionEncodeResponse, signature);
 
   if (!broadcastResponse) {
     throw new Error("Broadcast aborted");

@@ -1,6 +1,7 @@
 import { AdamikSignerSpec } from "../adamik/types";
 import { overridedPrompt } from "../utils";
 import { DfnsSigner } from "./Dfns";
+import { IoFinnetSigner } from "./IoFinnet";
 import { LocalSigner } from "./LocalSigner";
 import { SodotSigner } from "./Sodot";
 import { TurnkeySigner } from "./Turnkey";
@@ -8,6 +9,7 @@ import { BaseSigner } from "./types";
 
 export enum Signer {
   DFNS = "DFNS",
+  IOFINNET = "IOFINNET",
   LOCAL = "LOCAL MNEMONIC (UNSECURE)",
   SODOT = "SODOT",
   TURNKEY = "TURNKEY",
@@ -53,6 +55,10 @@ export const signerSelector = async (
       // Should throw an error if the config is not valid.
       DfnsSigner.isConfigValid();
       return new DfnsSigner(chainId, signerSpec);
+    case Signer.IOFINNET:
+      // Should throw an error if the config is not valid.
+      IoFinnetSigner.isConfigValid();
+      return new IoFinnetSigner(chainId, signerSpec);
     default:
       throw new Error(`Unsupported signer: ${signerName}`);
   }

@@ -36,6 +36,14 @@ export const encodePubKeyToAddress = async (
     return addresses[0].address;
   }
 
+  // For Bitcoin, automatically select P2WPKH (native SegWit) if available
+  if (chainId === "bitcoin" || chainId === "bitcoin-testnet") {
+    const p2wpkhAddress = addresses.find((addr: any) => addr.type === "p2wpkh");
+    if (p2wpkhAddress) {
+      return p2wpkhAddress.address;
+    }
+  }
+
   const { address } = await overridedPrompt({
     type: "select",
     name: "address",

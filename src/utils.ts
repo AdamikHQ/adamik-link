@@ -32,7 +32,10 @@ export const amountToMainUnit = (
   const parsedAmount = amount === "0" ? 0 : Number(amount);
   return Number.isNaN(parsedAmount)
     ? null
-    : (parsedAmount / Math.pow(10, decimals)).toString();
+    : (parsedAmount / Math.pow(10, decimals)).toLocaleString(undefined, {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 18,
+      });
 };
 
 /**

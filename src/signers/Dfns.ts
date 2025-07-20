@@ -94,6 +94,10 @@ export class DfnsSigner implements BaseSigner {
     return wallets;
   }
 
+  async getAddress(): Promise<string> {
+    throw new Error("Not implemented");
+  }
+
   async getPubkey() {
     const wallets = await this.listWallets();
 
