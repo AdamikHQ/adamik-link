@@ -57,20 +57,18 @@ export const displayBalance = (
   ]);
 
   // Add token balances if they exist
-  if (accountState.balances.tokens?.length > 0) {
-    accountState.balances.tokens.forEach((token) => {
-      balanceTable.push([
-        picocolors.bold(token.token.ticker),
-        picocolors.cyan(
-          amountToMainUnit(token.amount, parseInt(token.token.decimals))
-        ),
-        picocolors.cyan(
-          amountToMainUnit(token.amount, parseInt(token.token.decimals))
-        ),
-        picocolors.italic(token.token.name),
-      ]);
-    });
-  }
+  accountState.balances.tokens?.forEach((token) => {
+    balanceTable.push([
+      picocolors.bold(token.token.ticker),
+      picocolors.cyan(
+        amountToMainUnit(token.amount, parseInt(token.token.decimals))
+      ),
+      picocolors.cyan(
+        amountToMainUnit(token.amount, parseInt(token.token.decimals))
+      ),
+      picocolors.italic(token.token.name),
+    ]);
+  });
 
   console.log("\n" + picocolors.bold("Account Balances:"));
   console.log(balanceTable.toString() + "\n");
@@ -127,7 +125,7 @@ export const displayBalance = (
           ),
           picocolors.green(pos.status),
           pos.completionDate
-            ? new Date(pos.completionDate).toLocaleString()
+            ? new Date(Number(pos.completionDate)).toLocaleString()
             : "-",
         ]);
       });

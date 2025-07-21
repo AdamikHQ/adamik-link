@@ -48,7 +48,7 @@ export type StakingPosition = {
   validatorAddresses: string[];
   amount: string;
   status: "free" | string; // Add other possible status values if known
-  completionDate: number;
+  completionDate: string;
 };
 
 export type StakingReward = {
