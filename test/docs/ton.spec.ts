@@ -75,9 +75,10 @@ const transactionBroadcast = async () => {
         amount: "10000",
         useMaxAmount: false,
         validatorAddress: "",
-        params: {
+        params: JSON.stringify({
+          timeout: Math.floor(Date.now() / 1000) + 300,
           pubKey: keyPair.publicKey.toString("hex"),
-        },
+        }),
       },
     },
   };
@@ -98,6 +99,12 @@ const transactionBroadcast = async () => {
 
   const encodedData = await responseEncode.json();
   console.log("\x1b[32m" + JSON.stringify(encodedData, null, 2) + "\x1b[0m");
+
+  // Check if encoding failed
+  if (encodedData.status?.errors?.length > 0) {
+    const errorMessages = encodedData.status.errors.map((e: any) => e.message).join(', ');
+    throw new Error(`Transaction encoding failed: ${errorMessages}`);
+  }
 
   // Sign the encoded transaction
   const toSign = encodedData.transaction.encoded.find(
@@ -152,6 +159,14 @@ const transactionBroadcast = async () => {
 describe("TON with Adamik", () => {
   it("should encode a transaction and broadcast it", async () => {
     const responseData = await transactionBroadcast();
+    
+    // Check if there are any errors in the response
+    if (responseData.status?.errors?.length > 0) {
+      const errorMessages = responseData.status.errors.map((e: any) => e.message).join(', ');
+      throw new Error(`Transaction broadcast failed: ${errorMessages}`);
+    }
+    
+    // Only check for hash if transaction was successful
     expect(responseData.hash).to.exist;
   });
 });
