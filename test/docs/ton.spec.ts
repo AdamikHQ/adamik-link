@@ -77,7 +77,6 @@ const transactionBroadcast = async () => {
         validatorAddress: "",
         params: JSON.stringify({
           timeout: Math.floor(Date.now() / 1000) + 300,
-          pubKey: keyPair.publicKey.toString("hex"),
         }),
       },
     },
