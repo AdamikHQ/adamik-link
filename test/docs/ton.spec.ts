@@ -8,7 +8,7 @@ dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 
 const walletPhrase = process.env.UNSECURE_LOCAL_SEED || "";
 const ADAMIK_API_KEY = process.env.ADAMIK_API_KEY || "your-adamik-api-key"; // get it from https://dashboard.adamik.io
-const recipientAddress = "";
+const recipientAddress = "UQDbIvjHr-5d-FMS8xIqOIqS4zsY7EwRz6rKfhLhaPcGUaZs";
 const ADAMIK_API_BASE_URL =
   process.env.ADAMIK_API_BASE_URL || "https://api.adamik.io";
 const chainId = "ton";
@@ -71,7 +71,7 @@ const transactionBroadcast = async () => {
         chainId: chainId, // TON blockchain
         mode: "transfer",
         senderAddress: address,
-        recipientAddress: recipientAddress || address,
+        recipientAddress: recipientAddress,
         amount: "10000",
         useMaxAmount: false,
         validatorAddress: "",
@@ -101,7 +101,9 @@ const transactionBroadcast = async () => {
 
   // Check if encoding failed
   if (encodedData.status?.errors?.length > 0) {
-    const errorMessages = encodedData.status.errors.map((e: any) => e.message).join(', ');
+    const errorMessages = encodedData.status.errors
+      .map((e: any) => e.message)
+      .join(", ");
     throw new Error(`Transaction encoding failed: ${errorMessages}`);
   }
 
@@ -158,13 +160,15 @@ const transactionBroadcast = async () => {
 describe("TON with Adamik", () => {
   it("should encode a transaction and broadcast it", async () => {
     const responseData = await transactionBroadcast();
-    
+
     // Check if there are any errors in the response
     if (responseData.status?.errors?.length > 0) {
-      const errorMessages = responseData.status.errors.map((e: any) => e.message).join(', ');
+      const errorMessages = responseData.status.errors
+        .map((e: any) => e.message)
+        .join(", ");
       throw new Error(`Transaction broadcast failed: ${errorMessages}`);
     }
-    
+
     // Only check for hash if transaction was successful
     expect(responseData.hash).to.exist;
   });
