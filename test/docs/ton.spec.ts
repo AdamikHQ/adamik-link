@@ -101,7 +101,9 @@ const transactionBroadcast = async () => {
 
   // Check if encoding failed
   if (encodedData.status?.errors?.length > 0) {
-    const errorMessages = encodedData.status.errors.map((e: any) => e.message).join(', ');
+    const errorMessages = encodedData.status.errors
+      .map((e: any) => e.message)
+      .join(", ");
     throw new Error(`Transaction encoding failed: ${errorMessages}`);
   }
 
@@ -158,13 +160,15 @@ const transactionBroadcast = async () => {
 describe("TON with Adamik", () => {
   it("should encode a transaction and broadcast it", async () => {
     const responseData = await transactionBroadcast();
-    
+
     // Check if there are any errors in the response
     if (responseData.status?.errors?.length > 0) {
-      const errorMessages = responseData.status.errors.map((e: any) => e.message).join(', ');
+      const errorMessages = responseData.status.errors
+        .map((e: any) => e.message)
+        .join(", ");
       throw new Error(`Transaction broadcast failed: ${errorMessages}`);
     }
-    
+
     // Only check for hash if transaction was successful
     expect(responseData.hash).to.exist;
   });
