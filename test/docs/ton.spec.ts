@@ -8,7 +8,7 @@ dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 
 const walletPhrase = process.env.UNSECURE_LOCAL_SEED || "";
 const ADAMIK_API_KEY = process.env.ADAMIK_API_KEY || "your-adamik-api-key"; // get it from https://dashboard.adamik.io
-const recipientAddress = "UQDbIvjHr-5d-FMS8xIqOIqS4zsY7EwRz6rKfhLhaPcGUaZs";
+const recipientAddress = "";
 const ADAMIK_API_BASE_URL =
   process.env.ADAMIK_API_BASE_URL || "https://api.adamik.io";
 const chainId = "ton";
@@ -71,7 +71,7 @@ const transactionBroadcast = async () => {
         chainId: chainId, // TON blockchain
         mode: "transfer",
         senderAddress: address,
-        recipientAddress: recipientAddress,
+        recipientAddress: recipientAddress || address,
         amount: "10000",
         useMaxAmount: false,
         validatorAddress: "",
