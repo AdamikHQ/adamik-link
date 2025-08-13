@@ -36,16 +36,12 @@ export const encodeTransaction = async ({
       {
         title: "Unstake",
         value: "unstake",
-        disabled:
-          accountState.balances.staking === undefined ||
-          accountState.balances.staking.positions.length === 0,
+        disabled: BigInt(accountState.balances.staking?.locked || 0n) === 0n,
       },
       {
         title: "Withdraw",
         value: "withdraw",
-        disabled:
-          accountState.balances.staking === undefined ||
-          accountState.balances.staking.positions.length === 0,
+        disabled: BigInt(accountState.balances.staking?.unlocked || 0n) === 0n,
       },
     ],
     initial: 0,
@@ -133,16 +129,18 @@ export const encodeTransaction = async ({
     case "unstake": {
       const positions = accountState.balances.staking!.positions;
       requestBody.transaction.data.mode = "unstake";
-      const choices: Choice[] = positions.map((position) => ({
-        title: `${position.validatorAddresses[0].slice(
-          0,
-          6
-        )}...${position.validatorAddresses[0].slice(-4)} (${amountToMainUnit(
-          position.amount,
-          chain.decimals
-        )} ${chain.ticker})`,
-        value: position,
-      }));
+      const choices: Choice[] = positions
+        .filter((position) => position.status === "locked")
+        .map((position) => ({
+          title: `${position.validatorAddresses[0].slice(
+            0,
+            6
+          )}...${position.validatorAddresses[0].slice(-4)} (${amountToMainUnit(
+            position.amount,
+            chain.decimals
+          )} ${chain.ticker})`,
+          value: position,
+        }));
 
       const { position } = await overridedPrompt({
         type: "select",
@@ -163,16 +161,18 @@ export const encodeTransaction = async ({
     case "withdraw": {
       const positions = accountState.balances.staking!.positions;
       requestBody.transaction.data.mode = "withdraw";
-      const choices: Choice[] = positions.map((position) => ({
-        title: `${position.validatorAddresses[0].slice(
-          0,
-          6
-        )}...${position.validatorAddresses[0].slice(-4)} (${amountToMainUnit(
-          position.amount,
-          chain.decimals
-        )} ${chain.ticker})`,
-        value: position,
-      }));
+      const choices: Choice[] = positions
+        .filter((position) => position.status === "unlocked")
+        .map((position) => ({
+          title: `${position.validatorAddresses[0].slice(
+            0,
+            6
+          )}...${position.validatorAddresses[0].slice(-4)} (${amountToMainUnit(
+            position.amount,
+            chain.decimals
+          )} ${chain.ticker})`,
+          value: position,
+        }));
 
       const { position } = await overridedPrompt({
         type: "select",
