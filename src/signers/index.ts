@@ -8,7 +8,7 @@ import { TurnkeySigner } from "./Turnkey";
 import { BaseSigner } from "./types";
 
 export enum Signer {
-  BLOCKDAEMON = "BLOCKDAEMON_TSM",
+  BLOCKDAEMON = "Builder Vault TSM",
   DFNS = "DFNS",
   LOCAL = "LOCAL MNEMONIC (UNSECURE)",
   SODOT = "SODOT",

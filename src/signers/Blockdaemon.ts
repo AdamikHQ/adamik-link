@@ -69,9 +69,9 @@ export class BlockdaemonSigner implements BaseSigner {
           process.env.BLOCKDAEMON_EXISTING_KEY_IDS?.split(",") || [];
         break;
       case AdamikCurve.ED25519:
-        throw new Error("ED25519 curve not yet supported by Blockdaemon TSM");
+        throw new Error("ED25519 curve not yet supported by Builder Vault TSM");
       case AdamikCurve.STARK:
-        throw new Error("STARK curve not supported by Blockdaemon TSM");
+        throw new Error("STARK curve not supported by Builder Vault TSM");
       default:
         throw new Error(`Unsupported curve: ${curve}`);
     }
@@ -89,14 +89,14 @@ export class BlockdaemonSigner implements BaseSigner {
     // Must have either certificate content or valid certificate file path
     if (!hasCertContent && (!hasCertPath || !fs.existsSync(certPath))) {
       throw new Error(
-        "Blockdaemon client certificate required. Please provide either BLOCKDAEMON_CLIENT_CERT_PATH (file) or BLOCKDAEMON_CLIENT_CERT_CONTENT (content)."
+        "Builder Vault TSM client certificate required. Please provide either BLOCKDAEMON_CLIENT_CERT_PATH (file) or BLOCKDAEMON_CLIENT_CERT_CONTENT (content)."
       );
     }
 
     // Must have either key content or valid key file path
     if (!hasKeyContent && (!hasKeyPath || !fs.existsSync(keyPath))) {
       throw new Error(
-        "Blockdaemon client key required. Please provide either BLOCKDAEMON_CLIENT_KEY_PATH (file) or BLOCKDAEMON_CLIENT_KEY_CONTENT (content)."
+        "Builder Vault TSM client key required. Please provide either BLOCKDAEMON_CLIENT_KEY_PATH (file) or BLOCKDAEMON_CLIENT_KEY_CONTENT (content)."
       );
     }
 
@@ -109,13 +109,13 @@ export class BlockdaemonSigner implements BaseSigner {
     const blockdaemonDir = path.resolve("./blockdaemon_client");
     if (!fs.existsSync(blockdaemonDir)) {
       throw new Error(
-        `Blockdaemon client directory not found at: ${blockdaemonDir}`
+        `Builder Vault TSM client directory not found at: ${blockdaemonDir}`
       );
     }
 
     const mainGoPath = path.join(blockdaemonDir, "main.go");
     if (!fs.existsSync(mainGoPath)) {
-      throw new Error(`Blockdaemon main.go not found at: ${mainGoPath}`);
+      throw new Error(`Builder Vault TSM main.go not found at: ${mainGoPath}`);
     }
 
     return true;
