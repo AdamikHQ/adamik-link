@@ -507,24 +507,95 @@ export class BlockdaemonSigner implements BaseSigner {
       infoTerminal(`r: ${result.r}`, this.signerName);
       infoTerminal(`s: ${result.s}`, this.signerName);
 
-      return this.formatSignature({ r: result.r, s: result.s });
+      // Pass the clean message hash for recovery ID calculation
+      return this.formatSignature({ r: result.r, s: result.s }, cleanMessage);
     } catch (error) {
       errorTerminal(`Signing failed: ${error}`, this.signerName);
       throw error;
     }
   }
 
+  // Calculate recovery ID (v) for RSV signature format
+  private calculateRecoveryId(
+    messageHash: string,
+    signature: { r: string; s: string },
+    publicKey: string
+  ): number {
+    try {
+      // Convert message hash to bytes
+      const msgHashBytes = Buffer.from(messageHash, "hex");
+
+      // Get the compressed public key point  
+      const pubKeyBytes = Buffer.from(publicKey, "hex");
+      const pubKeyPoint = secp256k1.ProjectivePoint.fromHex(pubKeyBytes);
+
+      // Create signature object
+      const sig = secp256k1.Signature.fromCompact(
+        Buffer.concat([
+          Buffer.from(signature.r.padStart(64, "0"), "hex"),
+          Buffer.from(signature.s.padStart(64, "0"), "hex"),
+        ])
+      );
+
+      // Try both recovery IDs (0 and 1, which correspond to v=27 and v=28)
+      for (let recoveryId = 0; recoveryId < 2; recoveryId++) {
+        try {
+          // Recover the public key using this recovery ID
+          const recoveredPoint = sig.addRecoveryBit(recoveryId).recoverPublicKey(msgHashBytes);
+
+          // Check if recovered public key matches our public key
+          if (recoveredPoint.equals(pubKeyPoint)) {
+            return recoveryId;
+          }
+        } catch {
+          // Continue to next recovery ID
+        }
+      }
+
+      // Default to 0 if recovery fails
+      return 0;
+    } catch (error) {
+      infoTerminal(`Recovery ID calculation failed, using default: ${error}`, this.signerName);
+      return 0;
+    }
+  }
+
   // Format the signature according to Adamik's requirements
-  private formatSignature(signatureData: { r: string; s: string }): string {
+  private formatSignature(
+    signatureData: { r: string; s: string },
+    messageHash?: string
+  ): string {
     try {
       // Convert the r,s values to the format expected by Adamik using extractSignature
       infoTerminal("Converting r,s values to Adamik format", this.signerName);
 
-      return extractSignature(this.signerSpec.signatureFormat, {
+      // For RSV format, we need to provide a recovery ID (v)
+      // For RS format, v is not needed
+      const signatureParams: { r: string; s: string; v?: string } = {
         r: signatureData.r,
         s: signatureData.s,
-        v: undefined, // ECDSA signatures from TSM don't include recovery ID
-      });
+      };
+
+      // Only add v parameter for RSV format
+      if (this.signerSpec.signatureFormat === "rsv") {
+        if (messageHash && this.cachedPublicKey) {
+          // Calculate the correct recovery ID
+          const recoveryId = this.calculateRecoveryId(
+            messageHash,
+            signatureData,
+            this.cachedPublicKey
+          );
+          // v = recoveryId + 27 for legacy transactions (most common)
+          signatureParams.v = (recoveryId + 27).toString(16);
+          infoTerminal(`Calculated recovery ID: ${recoveryId} (v=${27 + recoveryId})`, this.signerName);
+        } else {
+          // Fallback to default v value if we can't calculate
+          signatureParams.v = "1b"; // 27 in hex (recovery ID 0)
+          infoTerminal("Using default recovery ID: 0 (v=27)", this.signerName);
+        }
+      }
+
+      return extractSignature(this.signerSpec.signatureFormat, signatureParams);
     } catch (error) {
       errorTerminal(`Failed to format signature: ${error}`, this.signerName);
       throw error;
