@@ -94,13 +94,11 @@ export class BlockdaemonSigner implements BaseSigner {
       );
     }
 
-
     try {
       require("child_process").execSync("go version", { stdio: "ignore" });
     } catch {
       throw new Error("Go is not installed or not available in PATH");
     }
-
 
     const blockdaemonDir = path.resolve("./blockdaemon_client");
     if (!fs.existsSync(blockdaemonDir)) {
@@ -117,7 +115,6 @@ export class BlockdaemonSigner implements BaseSigner {
     return true;
   }
 
-
   private adamikCurveToTSMCurve(curve: AdamikCurve): string {
     switch (curve) {
       case AdamikCurve.SECP256K1:
@@ -127,10 +124,8 @@ export class BlockdaemonSigner implements BaseSigner {
     }
   }
 
-
   private convertTSMPublicKeyToCompressed(base64PublicKey: string): string {
     try {
-
       const publicKeyJson = JSON.parse(
         Buffer.from(base64PublicKey, "base64").toString("utf-8")
       ) as TSMPublicKeyResponse;
@@ -144,13 +139,10 @@ export class BlockdaemonSigner implements BaseSigner {
         );
       }
 
-
       const uncompressedKey = Buffer.from(publicKeyJson.point, "base64");
-
 
       let fullUncompressedKey: Uint8Array;
       if (uncompressedKey.length === 64) {
-
         fullUncompressedKey = new Uint8Array(65);
         fullUncompressedKey[0] = 0x04;
         fullUncompressedKey.set(uncompressedKey, 1);
@@ -161,7 +153,6 @@ export class BlockdaemonSigner implements BaseSigner {
           `Invalid public key length: ${uncompressedKey.length}, expected 64 or 65 bytes`
         );
       }
-
 
       const point = secp256k1.ProjectivePoint.fromHex(fullUncompressedKey);
       const compressedKey = point.toRawBytes(true);
@@ -175,7 +166,6 @@ export class BlockdaemonSigner implements BaseSigner {
     }
   }
 
-
   private async createTempCertFiles(): Promise<{
     certPath: string;
     keyPath: string;
@@ -186,13 +176,11 @@ export class BlockdaemonSigner implements BaseSigner {
     let keyPath = this.clientKeyPath;
     const filesToCleanup: string[] = [];
 
-
     if (this.clientCertContent) {
       certPath = path.join(tempDir, "temp_client.crt");
       fs.writeFileSync(certPath, this.clientCertContent);
       filesToCleanup.push(certPath);
     }
-
 
     if (this.clientKeyContent) {
       keyPath = path.join(tempDir, "temp_client.key");
@@ -202,19 +190,18 @@ export class BlockdaemonSigner implements BaseSigner {
 
     const cleanup = () => {
       filesToCleanup.forEach((file) => {
-              try {
-        if (fs.existsSync(file)) {
-          fs.unlinkSync(file);
+        try {
+          if (fs.existsSync(file)) {
+            fs.unlinkSync(file);
+          }
+        } catch {
+          // Ignore cleanup errors
         }
-      } catch {
-        // Ignore cleanup errors
-      }
       });
     };
 
     return { certPath, keyPath, cleanup };
   }
-
 
   private async callGoBinary(
     command: string,
@@ -273,7 +260,6 @@ export class BlockdaemonSigner implements BaseSigner {
     });
   }
 
-
   private parseKeygenOutput(output: string): BlockdaemonKeygenResponse {
     const lines = output.split("\n");
     let keyId = "";
@@ -294,7 +280,6 @@ export class BlockdaemonSigner implements BaseSigner {
 
     return { keyId, publicKey };
   }
-
 
   private parseSignOutput(
     output: string
@@ -323,7 +308,6 @@ export class BlockdaemonSigner implements BaseSigner {
     return { signature: `${r},${s}`, keyId, r, s };
   }
 
-
   private parsePubkeyOutput(output: string): BlockdaemonKeygenResponse {
     const lines = output.split("\n");
     let keyId = "";
@@ -344,7 +328,6 @@ export class BlockdaemonSigner implements BaseSigner {
 
     return { keyId, publicKey };
   }
-
 
   private async keygenTSM(): Promise<{ keyIds: string[]; publicKey: string }> {
     infoTerminal("Starting distributed key generation...", this.signerName);
@@ -373,10 +356,8 @@ export class BlockdaemonSigner implements BaseSigner {
     }
   }
 
-
   private async getPublicKeyFromTSM(keyId: string): Promise<string> {
     try {
-
       if (this.cachedPublicKey) {
         infoTerminal(
           `Using cached public key for key ID: ${keyId}`,
@@ -389,7 +370,6 @@ export class BlockdaemonSigner implements BaseSigner {
         `Retrieving public key for key ID: ${keyId}`,
         this.signerName
       );
-
 
       const output = await this.callGoBinary("get-pubkey", [keyId]);
       const result = this.parsePubkeyOutput(output);
@@ -407,7 +387,6 @@ export class BlockdaemonSigner implements BaseSigner {
         this.signerName
       );
 
-
       this.cachedPublicKey = compressedPublicKey;
       return compressedPublicKey;
     } catch (error) {
@@ -417,7 +396,6 @@ export class BlockdaemonSigner implements BaseSigner {
   }
 
   public async getPubkey(): Promise<string> {
-
     if (this.keyIds.length === 0) {
       infoTerminal("Generating new TSM keypair...", this.signerName);
       const keyGenResults = await this.keygenTSM();
@@ -432,7 +410,6 @@ export class BlockdaemonSigner implements BaseSigner {
         `export BLOCKDAEMON_EXISTING_KEY_IDS="${this.keyIds.join(",")}"`,
         1000
       );
-
 
       this.cachedPublicKey = keyGenResults.publicKey;
       return keyGenResults.publicKey;
@@ -450,7 +427,6 @@ export class BlockdaemonSigner implements BaseSigner {
     return this.signMessage(hash);
   }
 
-
   private async signMessage(message: string): Promise<string> {
     if (this.keyIds.length === 0) {
       throw new Error(
@@ -464,7 +440,6 @@ export class BlockdaemonSigner implements BaseSigner {
     infoTerminal(`Signing with key ID: ${keyId}`, this.signerName);
 
     try {
-
       const cleanMessage = message.replace("0x", "");
 
       const output = await this.callGoBinary("sign", [keyId, cleanMessage]);
@@ -474,7 +449,6 @@ export class BlockdaemonSigner implements BaseSigner {
       infoTerminal(`r: ${result.r}`, this.signerName);
       infoTerminal(`s: ${result.s}`, this.signerName);
 
-
       return this.formatSignature({ r: result.r, s: result.s }, cleanMessage);
     } catch (error) {
       errorTerminal(`Signing failed: ${error}`, this.signerName);
@@ -482,20 +456,16 @@ export class BlockdaemonSigner implements BaseSigner {
     }
   }
 
-
   private calculateRecoveryId(
     messageHash: string,
     signature: { r: string; s: string },
     publicKey: string
   ): number {
     try {
-
       const msgHashBytes = Buffer.from(messageHash, "hex");
-
 
       const pubKeyBytes = Buffer.from(publicKey, "hex");
       const pubKeyPoint = secp256k1.ProjectivePoint.fromHex(pubKeyBytes);
-
 
       const sig = secp256k1.Signature.fromCompact(
         Buffer.concat([
@@ -504,12 +474,11 @@ export class BlockdaemonSigner implements BaseSigner {
         ])
       );
 
-
       for (let recoveryId = 0; recoveryId < 2; recoveryId++) {
         try {
-
-          const recoveredPoint = sig.addRecoveryBit(recoveryId).recoverPublicKey(msgHashBytes);
-
+          const recoveredPoint = sig
+            .addRecoveryBit(recoveryId)
+            .recoverPublicKey(msgHashBytes);
 
           if (recoveredPoint.equals(pubKeyPoint)) {
             return recoveryId;
@@ -519,33 +488,30 @@ export class BlockdaemonSigner implements BaseSigner {
         }
       }
 
-
       return 0;
     } catch (error) {
-      infoTerminal(`Recovery ID calculation failed, using default: ${error}`, this.signerName);
+      infoTerminal(
+        `Recovery ID calculation failed, using default: ${error}`,
+        this.signerName
+      );
       return 0;
     }
   }
-
 
   private formatSignature(
     signatureData: { r: string; s: string },
     messageHash?: string
   ): string {
     try {
-
       infoTerminal("Converting r,s values to Adamik format", this.signerName);
-
 
       const signatureParams: { r: string; s: string; v?: string } = {
         r: signatureData.r,
         s: signatureData.s,
       };
 
-
       if (this.signerSpec.signatureFormat === "rsv") {
         if (messageHash && this.cachedPublicKey) {
-
           const recoveryId = this.calculateRecoveryId(
             messageHash,
             signatureData,
@@ -553,7 +519,10 @@ export class BlockdaemonSigner implements BaseSigner {
           );
 
           signatureParams.v = recoveryId.toString(16);
-          infoTerminal(`Calculated recovery ID: ${recoveryId} (v=${recoveryId})`, this.signerName);
+          infoTerminal(
+            `Calculated recovery ID: ${recoveryId} (v=${recoveryId})`,
+            this.signerName
+          );
         } else {
           signatureParams.v = "0";
           infoTerminal("Using default recovery ID: 0 (v=0)", this.signerName);
