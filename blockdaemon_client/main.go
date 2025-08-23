@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/pem"
 	"fmt"
 	"os"
@@ -225,8 +225,13 @@ func sign(index int, keyId, message string, session tsm.SessionConfig, broadcast
 		panic(err)
 	}
 
-	messageHash := sha256.Sum256([]byte(message))
-	partialSignResult, err := client.ECDSA().Sign(context.Background(), &session, keyId, nil, messageHash[:])
+	// Decode the hex-encoded hash that's passed as message (already hashed by Adamik)
+	messageHashBytes, err := hex.DecodeString(message)
+	if err != nil {
+		panic(fmt.Errorf("failed to decode message hash: %w", err))
+	}
+	
+	partialSignResult, err := client.ECDSA().Sign(context.Background(), &session, keyId, nil, messageHashBytes)
 	if err != nil {
 		panic(err)
 	}
@@ -244,7 +249,7 @@ func sign(index int, keyId, message string, session tsm.SessionConfig, broadcast
 
 	// Assembling the partial sigs can be done externally to the SDK as well, it doesn't require any MPC node to be online
 	// This is done as part of the SDK for convenience here
-	signature, err := tsm.ECDSAFinalizeSignature(messageHash[:], partialSignatures)
+	signature, err := tsm.ECDSAFinalizeSignature(messageHashBytes, partialSignatures)
 	if err != nil {
 		panic(err)
 	}
