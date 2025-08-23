@@ -225,7 +225,7 @@ func sign(index int, keyId, message string, session tsm.SessionConfig, broadcast
 		panic(err)
 	}
 
-	// Decode the hex-encoded hash that's passed as message (already hashed by Adamik)
+
 	messageHashBytes, err := hex.DecodeString(message)
 	if err != nil {
 		panic(fmt.Errorf("failed to decode message hash: %w", err))
@@ -247,8 +247,7 @@ func sign(index int, keyId, message string, session tsm.SessionConfig, broadcast
 
 	}
 
-	// Assembling the partial sigs can be done externally to the SDK as well, it doesn't require any MPC node to be online
-	// This is done as part of the SDK for convenience here
+
 	signature, err := tsm.ECDSAFinalizeSignature(messageHashBytes, partialSignatures)
 	if err != nil {
 		panic(err)

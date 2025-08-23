@@ -37,26 +37,6 @@ export class BlockdaemonSigner implements BaseSigner {
   public signerSpec: AdamikSignerSpec;
   public signerName = Signer.BLOCKDAEMON;
 
-  // TSM node configuration (similar to Sodot's SODOT_VERTICES)
-  private TSM_NODES = [
-    {
-      url: "https://tsm-sandbox.prd.wallet.blockdaemon.app:8080",
-      nodeIndex: 0,
-    },
-    {
-      url: "https://tsm-sandbox.prd.wallet.blockdaemon.app:8081",
-      nodeIndex: 1,
-    },
-    {
-      url: "https://tsm-sandbox.prd.wallet.blockdaemon.app:8082",
-      nodeIndex: 2,
-    },
-  ];
-
-  private n = 3; // Total nodes
-  private t = 2; // Threshold (2 of 3)
-
-  // Similar to Sodot's keyIds array
   private keyIds: string[] = [];
   private clientCertPath: string;
   private clientKeyPath: string;
@@ -68,7 +48,6 @@ export class BlockdaemonSigner implements BaseSigner {
     this.chainId = chainId;
     this.signerSpec = signerSpec;
 
-    // Support both file paths and direct content for certificates
     this.clientCertPath =
       process.env.BLOCKDAEMON_CLIENT_CERT_PATH ||
       "./blockdaemon_client/client.crt";
@@ -76,12 +55,9 @@ export class BlockdaemonSigner implements BaseSigner {
       process.env.BLOCKDAEMON_CLIENT_KEY_PATH ||
       "./blockdaemon_client/client.key";
 
-    // Support direct certificate content in environment variables
     this.clientCertContent =
       process.env.BLOCKDAEMON_CLIENT_CERT_CONTENT || null;
     this.clientKeyContent = process.env.BLOCKDAEMON_CLIENT_KEY_CONTENT || null;
-
-    // Load existing key IDs from environment (similar to Sodot)
     switch (signerSpec.curve) {
       case AdamikCurve.SECP256K1:
         this.keyIds =
@@ -104,32 +80,28 @@ export class BlockdaemonSigner implements BaseSigner {
       process.env.BLOCKDAEMON_CLIENT_KEY_PATH ||
       "./blockdaemon_client/client.key";
 
-    // Check if we have certificate content directly or via files
     const hasCertContent = !!process.env.BLOCKDAEMON_CLIENT_CERT_CONTENT;
     const hasKeyContent = !!process.env.BLOCKDAEMON_CLIENT_KEY_CONTENT;
-
-    // Validate certificate availability
     if (!hasCertContent && !fs.existsSync(certPath)) {
       throw new Error(
         `Blockdaemon client certificate not found at: ${certPath}. Please provide either BLOCKDAEMON_CLIENT_CERT_PATH (file) or BLOCKDAEMON_CLIENT_CERT_CONTENT (content).`
       );
     }
 
-    // Validate key availability
     if (!hasKeyContent && !fs.existsSync(keyPath)) {
       throw new Error(
         `Blockdaemon client key not found at: ${keyPath}. Please provide either BLOCKDAEMON_CLIENT_KEY_PATH (file) or BLOCKDAEMON_CLIENT_KEY_CONTENT (content).`
       );
     }
 
-    // Check if Go is available
+
     try {
       require("child_process").execSync("go version", { stdio: "ignore" });
     } catch {
       throw new Error("Go is not installed or not available in PATH");
     }
 
-    // Verify blockdaemon_client directory exists
+
     const blockdaemonDir = path.resolve("./blockdaemon_client");
     if (!fs.existsSync(blockdaemonDir)) {
       throw new Error(
@@ -145,7 +117,7 @@ export class BlockdaemonSigner implements BaseSigner {
     return true;
   }
 
-  // Convert Adamik curve to the curve name used by TSM
+
   private adamikCurveToTSMCurve(curve: AdamikCurve): string {
     switch (curve) {
       case AdamikCurve.SECP256K1:
@@ -155,10 +127,10 @@ export class BlockdaemonSigner implements BaseSigner {
     }
   }
 
-  // Convert TSM public key format to compressed secp256k1 format expected by Adamik
+
   private convertTSMPublicKeyToCompressed(base64PublicKey: string): string {
     try {
-      // Decode the base64 JSON
+
       const publicKeyJson = JSON.parse(
         Buffer.from(base64PublicKey, "base64").toString("utf-8")
       ) as TSMPublicKeyResponse;
@@ -172,13 +144,13 @@ export class BlockdaemonSigner implements BaseSigner {
         );
       }
 
-      // Decode the point (uncompressed public key)
+
       const uncompressedKey = Buffer.from(publicKeyJson.point, "base64");
 
-      // TSM returns 64 bytes (x, y coordinates), but noble curves expects 65 bytes with 0x04 prefix
+
       let fullUncompressedKey: Uint8Array;
       if (uncompressedKey.length === 64) {
-        // Add the 0x04 prefix for uncompressed format
+
         fullUncompressedKey = new Uint8Array(65);
         fullUncompressedKey[0] = 0x04;
         fullUncompressedKey.set(uncompressedKey, 1);
@@ -190,11 +162,9 @@ export class BlockdaemonSigner implements BaseSigner {
         );
       }
 
-      // Convert to compressed format using noble curves
-      const point = secp256k1.ProjectivePoint.fromHex(fullUncompressedKey);
-      const compressedKey = point.toRawBytes(true); // true for compressed format
 
-      // Return as hex string without 0x prefix (following LocalSigner pattern)
+      const point = secp256k1.ProjectivePoint.fromHex(fullUncompressedKey);
+      const compressedKey = point.toRawBytes(true);
       return Buffer.from(compressedKey).toString("hex");
     } catch (error) {
       errorTerminal(
@@ -205,7 +175,7 @@ export class BlockdaemonSigner implements BaseSigner {
     }
   }
 
-  // Create temporary certificate files if content is provided via environment variables
+
   private async createTempCertFiles(): Promise<{
     certPath: string;
     keyPath: string;
@@ -216,14 +186,14 @@ export class BlockdaemonSigner implements BaseSigner {
     let keyPath = this.clientKeyPath;
     const filesToCleanup: string[] = [];
 
-    // Create temporary certificate file if content is provided
+
     if (this.clientCertContent) {
       certPath = path.join(tempDir, "temp_client.crt");
       fs.writeFileSync(certPath, this.clientCertContent);
       filesToCleanup.push(certPath);
     }
 
-    // Create temporary key file if content is provided
+
     if (this.clientKeyContent) {
       keyPath = path.join(tempDir, "temp_client.key");
       fs.writeFileSync(keyPath, this.clientKeyContent);
@@ -232,20 +202,20 @@ export class BlockdaemonSigner implements BaseSigner {
 
     const cleanup = () => {
       filesToCleanup.forEach((file) => {
-        try {
-          if (fs.existsSync(file)) {
-            fs.unlinkSync(file);
-          }
-        } catch (error) {
-          // Ignore cleanup errors
+              try {
+        if (fs.existsSync(file)) {
+          fs.unlinkSync(file);
         }
+      } catch {
+        // Ignore cleanup errors
+      }
       });
     };
 
     return { certPath, keyPath, cleanup };
   }
 
-  // Call the Go binary (similar to Sodot's HTTP calls)
+
   private async callGoBinary(
     command: string,
     args: string[] = []
@@ -262,7 +232,7 @@ export class BlockdaemonSigner implements BaseSigner {
         stdio: ["pipe", "pipe", "pipe"],
         env: {
           ...process.env,
-          // Use the resolved cert paths (either original or temporary)
+
           CLIENT_CERT_PATH: certPath,
           CLIENT_KEY_PATH: keyPath,
         },
@@ -280,7 +250,7 @@ export class BlockdaemonSigner implements BaseSigner {
       });
 
       child.on("close", (code) => {
-        cleanup(); // Clean up temporary files
+        cleanup();
         if (code === 0) {
           resolve(output.trim());
         } else {
@@ -293,7 +263,7 @@ export class BlockdaemonSigner implements BaseSigner {
       });
 
       child.on("error", (error) => {
-        cleanup(); // Clean up temporary files
+        cleanup();
         errorTerminal(
           `Failed to start TSM process: ${error.message}`,
           this.signerName
@@ -303,7 +273,7 @@ export class BlockdaemonSigner implements BaseSigner {
     });
   }
 
-  // Parse the Go binary output to extract key information
+
   private parseKeygenOutput(output: string): BlockdaemonKeygenResponse {
     const lines = output.split("\n");
     let keyId = "";
@@ -325,7 +295,7 @@ export class BlockdaemonSigner implements BaseSigner {
     return { keyId, publicKey };
   }
 
-  // Parse the Go binary output to extract signature information
+
   private parseSignOutput(
     output: string
   ): BlockdaemonSignResponse & { r: string; s: string } {
@@ -353,7 +323,7 @@ export class BlockdaemonSigner implements BaseSigner {
     return { signature: `${r},${s}`, keyId, r, s };
   }
 
-  // Parse the Go binary output to extract public key information from get-pubkey command
+
   private parsePubkeyOutput(output: string): BlockdaemonKeygenResponse {
     const lines = output.split("\n");
     let keyId = "";
@@ -375,7 +345,7 @@ export class BlockdaemonSigner implements BaseSigner {
     return { keyId, publicKey };
   }
 
-  // Generate a new TSM key (similar to Sodot's keygenVertex)
+
   private async keygenTSM(): Promise<{ keyIds: string[]; publicKey: string }> {
     infoTerminal("Starting distributed key generation...", this.signerName);
 
@@ -385,8 +355,6 @@ export class BlockdaemonSigner implements BaseSigner {
 
       infoTerminal(`TSM key generated successfully!`, this.signerName);
       infoTerminal(`Key ID: ${result.keyId}`, this.signerName);
-
-      // Convert TSM format to compressed secp256k1 format
       const compressedPublicKey = this.convertTSMPublicKeyToCompressed(
         result.publicKey
       );
@@ -405,10 +373,10 @@ export class BlockdaemonSigner implements BaseSigner {
     }
   }
 
-  // Get public key from an existing TSM key
+
   private async getPublicKeyFromTSM(keyId: string): Promise<string> {
     try {
-      // Check if we have a cached public key
+
       if (this.cachedPublicKey) {
         infoTerminal(
           `Using cached public key for key ID: ${keyId}`,
@@ -422,7 +390,7 @@ export class BlockdaemonSigner implements BaseSigner {
         this.signerName
       );
 
-      // Use the proper get-pubkey command from the TSM SDK
+
       const output = await this.callGoBinary("get-pubkey", [keyId]);
       const result = this.parsePubkeyOutput(output);
 
@@ -431,7 +399,6 @@ export class BlockdaemonSigner implements BaseSigner {
         this.signerName
       );
 
-      // Convert TSM format to compressed secp256k1 format
       const compressedPublicKey = this.convertTSMPublicKeyToCompressed(
         result.publicKey
       );
@@ -440,7 +407,7 @@ export class BlockdaemonSigner implements BaseSigner {
         this.signerName
       );
 
-      // Cache the converted result for this session
+
       this.cachedPublicKey = compressedPublicKey;
       return compressedPublicKey;
     } catch (error) {
@@ -450,7 +417,7 @@ export class BlockdaemonSigner implements BaseSigner {
   }
 
   public async getPubkey(): Promise<string> {
-    // If no keyIds provided, generate new keypair (like Sodot)
+
     if (this.keyIds.length === 0) {
       infoTerminal("Generating new TSM keypair...", this.signerName);
       const keyGenResults = await this.keygenTSM();
@@ -466,7 +433,7 @@ export class BlockdaemonSigner implements BaseSigner {
         1000
       );
 
-      // Cache and return the public key from the generation result
+
       this.cachedPublicKey = keyGenResults.publicKey;
       return keyGenResults.publicKey;
     } else {
@@ -483,7 +450,7 @@ export class BlockdaemonSigner implements BaseSigner {
     return this.signMessage(hash);
   }
 
-  // Core signing method (similar to Sodot's sign method)
+
   private async signMessage(message: string): Promise<string> {
     if (this.keyIds.length === 0) {
       throw new Error(
@@ -497,7 +464,7 @@ export class BlockdaemonSigner implements BaseSigner {
     infoTerminal(`Signing with key ID: ${keyId}`, this.signerName);
 
     try {
-      // Clean the message (remove 0x prefix if present)
+
       const cleanMessage = message.replace("0x", "");
 
       const output = await this.callGoBinary("sign", [keyId, cleanMessage]);
@@ -507,7 +474,7 @@ export class BlockdaemonSigner implements BaseSigner {
       infoTerminal(`r: ${result.r}`, this.signerName);
       infoTerminal(`s: ${result.s}`, this.signerName);
 
-      // Pass the clean message hash for recovery ID calculation
+
       return this.formatSignature({ r: result.r, s: result.s }, cleanMessage);
     } catch (error) {
       errorTerminal(`Signing failed: ${error}`, this.signerName);
@@ -515,21 +482,21 @@ export class BlockdaemonSigner implements BaseSigner {
     }
   }
 
-  // Calculate recovery ID (v) for RSV signature format
+
   private calculateRecoveryId(
     messageHash: string,
     signature: { r: string; s: string },
     publicKey: string
   ): number {
     try {
-      // Convert message hash to bytes
+
       const msgHashBytes = Buffer.from(messageHash, "hex");
 
-      // Get the compressed public key point  
+
       const pubKeyBytes = Buffer.from(publicKey, "hex");
       const pubKeyPoint = secp256k1.ProjectivePoint.fromHex(pubKeyBytes);
 
-      // Create signature object
+
       const sig = secp256k1.Signature.fromCompact(
         Buffer.concat([
           Buffer.from(signature.r.padStart(64, "0"), "hex"),
@@ -537,22 +504,22 @@ export class BlockdaemonSigner implements BaseSigner {
         ])
       );
 
-      // Try both recovery IDs (0 and 1, which correspond to v=27 and v=28)
+
       for (let recoveryId = 0; recoveryId < 2; recoveryId++) {
         try {
-          // Recover the public key using this recovery ID
+
           const recoveredPoint = sig.addRecoveryBit(recoveryId).recoverPublicKey(msgHashBytes);
 
-          // Check if recovered public key matches our public key
+
           if (recoveredPoint.equals(pubKeyPoint)) {
             return recoveryId;
           }
         } catch {
-          // Continue to next recovery ID
+          continue;
         }
       }
 
-      // Default to 0 if recovery fails
+
       return 0;
     } catch (error) {
       infoTerminal(`Recovery ID calculation failed, using default: ${error}`, this.signerName);
@@ -560,38 +527,35 @@ export class BlockdaemonSigner implements BaseSigner {
     }
   }
 
-  // Format the signature according to Adamik's requirements
+
   private formatSignature(
     signatureData: { r: string; s: string },
     messageHash?: string
   ): string {
     try {
-      // Convert the r,s values to the format expected by Adamik using extractSignature
+
       infoTerminal("Converting r,s values to Adamik format", this.signerName);
 
-      // For RSV format, we need to provide a recovery ID (v)
-      // For RS format, v is not needed
+
       const signatureParams: { r: string; s: string; v?: string } = {
         r: signatureData.r,
         s: signatureData.s,
       };
 
-      // Only add v parameter for RSV format
+
       if (this.signerSpec.signatureFormat === "rsv") {
         if (messageHash && this.cachedPublicKey) {
-          // Calculate the correct recovery ID
+
           const recoveryId = this.calculateRecoveryId(
             messageHash,
             signatureData,
             this.cachedPublicKey
           );
-          // For EIP-1559 transactions, v is just the recovery ID (0 or 1)
-          // For legacy transactions, v = recoveryId + 27, but Adamik handles this conversion
+
           signatureParams.v = recoveryId.toString(16);
           infoTerminal(`Calculated recovery ID: ${recoveryId} (v=${recoveryId})`, this.signerName);
         } else {
-          // Fallback to default v value if we can't calculate
-          signatureParams.v = "0"; // Recovery ID 0 for EIP-1559
+          signatureParams.v = "0";
           infoTerminal("Using default recovery ID: 0 (v=0)", this.signerName);
         }
       }
