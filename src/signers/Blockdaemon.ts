@@ -585,13 +585,14 @@ export class BlockdaemonSigner implements BaseSigner {
             signatureData,
             this.cachedPublicKey
           );
-          // v = recoveryId + 27 for legacy transactions (most common)
-          signatureParams.v = (recoveryId + 27).toString(16);
-          infoTerminal(`Calculated recovery ID: ${recoveryId} (v=${27 + recoveryId})`, this.signerName);
+          // For EIP-1559 transactions, v is just the recovery ID (0 or 1)
+          // For legacy transactions, v = recoveryId + 27, but Adamik handles this conversion
+          signatureParams.v = recoveryId.toString(16);
+          infoTerminal(`Calculated recovery ID: ${recoveryId} (v=${recoveryId})`, this.signerName);
         } else {
           // Fallback to default v value if we can't calculate
-          signatureParams.v = "1b"; // 27 in hex (recovery ID 0)
-          infoTerminal("Using default recovery ID: 0 (v=27)", this.signerName);
+          signatureParams.v = "0"; // Recovery ID 0 for EIP-1559
+          infoTerminal("Using default recovery ID: 0 (v=0)", this.signerName);
         }
       }
 
