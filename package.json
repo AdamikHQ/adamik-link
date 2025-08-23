@@ -6,6 +6,8 @@
     "build": "tsc",
     "start": "tsx src/index.ts",
     "transaction": "tsx src/scripts/testTransactions.ts",
+    "test:blockdaemon": "tsx src/scripts/testBlockdaemonSigner.ts",
+    "test:blockdaemon:basic": "tsx src/scripts/testBlockdaemonSignerBasic.ts",
     "test:docs": "mocha --timeout 10000 -r tsx test/docs/*.spec.ts",
     "test:e2e": "mocha --timeout 600000 -r tsx test/e2e/**/*.spec.ts"
   },

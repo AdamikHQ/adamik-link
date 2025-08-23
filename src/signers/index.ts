@@ -1,5 +1,6 @@
 import { AdamikSignerSpec } from "../adamik/types";
 import { overridedPrompt } from "../utils";
+import { BlockdaemonSigner } from "./Blockdaemon";
 import { DfnsSigner } from "./Dfns";
 import { LocalSigner } from "./LocalSigner";
 import { SodotSigner } from "./Sodot";
@@ -7,6 +8,7 @@ import { TurnkeySigner } from "./Turnkey";
 import { BaseSigner } from "./types";
 
 export enum Signer {
+  BLOCKDAEMON = "BLOCKDAEMON_TSM",
   DFNS = "DFNS",
   LOCAL = "LOCAL MNEMONIC (UNSECURE)",
   SODOT = "SODOT",
@@ -38,6 +40,10 @@ export const signerSelector = async (
   });
 
   switch (signerName) {
+    case Signer.BLOCKDAEMON:
+      // Should throw an error if the config is not valid.
+      BlockdaemonSigner.isConfigValid();
+      return new BlockdaemonSigner(chainId, signerSpec);
     case Signer.LOCAL:
       LocalSigner.isConfigValid();
       return new LocalSigner(chainId, signerSpec);
