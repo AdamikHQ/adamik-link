@@ -32,14 +32,17 @@ type TSMPublicKeyResponse = {
   point: string;
 };
 
+// Constants for cryptographic operations
+const UNCOMPRESSED_KEY_PREFIX = 0x04;
+const EXPECTED_UNCOMPRESSED_LENGTH = 64;
+const EXPECTED_FULL_LENGTH = 65;
+
 export class BlockdaemonSigner implements BaseSigner {
   public chainId: string;
   public signerSpec: AdamikSignerSpec;
   public signerName = Signer.BLOCKDAEMON;
 
   private keyIds: string[] = [];
-  private clientCertPath: string;
-  private clientKeyPath: string;
   private clientCertContent: string | null = null;
   private clientKeyContent: string | null = null;
   private cachedPublicKey: string | null = null;
@@ -48,17 +51,19 @@ export class BlockdaemonSigner implements BaseSigner {
     this.chainId = chainId;
     this.signerSpec = signerSpec;
 
-    this.clientCertPath =
-      process.env.BLOCKDAEMON_CLIENT_CERT_PATH ||
-      "./blockdaemon_client/client.crt";
-    this.clientKeyPath =
-      process.env.BLOCKDAEMON_CLIENT_KEY_PATH ||
-      "./blockdaemon_client/client.key";
+    this.initializeCertificateConfig();
+    this.initializeKeyIds(signerSpec.curve);
+  }
 
+  private initializeCertificateConfig(): void {
+    // All certificate configuration is now handled via environment variables
     this.clientCertContent =
       process.env.BLOCKDAEMON_CLIENT_CERT_CONTENT || null;
     this.clientKeyContent = process.env.BLOCKDAEMON_CLIENT_KEY_CONTENT || null;
-    switch (signerSpec.curve) {
+  }
+
+  private initializeKeyIds(curve: AdamikCurve): void {
+    switch (curve) {
       case AdamikCurve.SECP256K1:
         this.keyIds =
           process.env.BLOCKDAEMON_EXISTING_KEY_IDS?.split(",") || [];
@@ -68,29 +73,30 @@ export class BlockdaemonSigner implements BaseSigner {
       case AdamikCurve.STARK:
         throw new Error("STARK curve not supported by Blockdaemon TSM");
       default:
-        throw new Error(`Unsupported curve: ${signerSpec.curve}`);
+        throw new Error(`Unsupported curve: ${curve}`);
     }
   }
 
   static isConfigValid(): boolean {
-    const certPath =
-      process.env.BLOCKDAEMON_CLIENT_CERT_PATH ||
-      "./blockdaemon_client/client.crt";
-    const keyPath =
-      process.env.BLOCKDAEMON_CLIENT_KEY_PATH ||
-      "./blockdaemon_client/client.key";
+    const certPath = process.env.BLOCKDAEMON_CLIENT_CERT_PATH;
+    const keyPath = process.env.BLOCKDAEMON_CLIENT_KEY_PATH;
 
     const hasCertContent = !!process.env.BLOCKDAEMON_CLIENT_CERT_CONTENT;
     const hasKeyContent = !!process.env.BLOCKDAEMON_CLIENT_KEY_CONTENT;
-    if (!hasCertContent && !fs.existsSync(certPath)) {
+    const hasCertPath = !!certPath;
+    const hasKeyPath = !!keyPath;
+
+    // Must have either certificate content or valid certificate file path
+    if (!hasCertContent && (!hasCertPath || !fs.existsSync(certPath))) {
       throw new Error(
-        `Blockdaemon client certificate not found at: ${certPath}. Please provide either BLOCKDAEMON_CLIENT_CERT_PATH (file) or BLOCKDAEMON_CLIENT_CERT_CONTENT (content).`
+        "Blockdaemon client certificate required. Please provide either BLOCKDAEMON_CLIENT_CERT_PATH (file) or BLOCKDAEMON_CLIENT_CERT_CONTENT (content)."
       );
     }
 
-    if (!hasKeyContent && !fs.existsSync(keyPath)) {
+    // Must have either key content or valid key file path
+    if (!hasKeyContent && (!hasKeyPath || !fs.existsSync(keyPath))) {
       throw new Error(
-        `Blockdaemon client key not found at: ${keyPath}. Please provide either BLOCKDAEMON_CLIENT_KEY_PATH (file) or BLOCKDAEMON_CLIENT_KEY_CONTENT (content).`
+        "Blockdaemon client key required. Please provide either BLOCKDAEMON_CLIENT_KEY_PATH (file) or BLOCKDAEMON_CLIENT_KEY_CONTENT (content)."
       );
     }
 
@@ -126,33 +132,12 @@ export class BlockdaemonSigner implements BaseSigner {
 
   private convertTSMPublicKeyToCompressed(base64PublicKey: string): string {
     try {
-      const publicKeyJson = JSON.parse(
-        Buffer.from(base64PublicKey, "base64").toString("utf-8")
-      ) as TSMPublicKeyResponse;
-
-      if (
-        publicKeyJson.scheme !== "ECDSA" ||
-        publicKeyJson.curve !== "secp256k1"
-      ) {
-        throw new Error(
-          `Unsupported key format: ${publicKeyJson.scheme}/${publicKeyJson.curve}`
-        );
-      }
+      const publicKeyJson = this.parseTSMPublicKey(base64PublicKey);
+      this.validateTSMPublicKey(publicKeyJson);
 
       const uncompressedKey = Buffer.from(publicKeyJson.point, "base64");
-
-      let fullUncompressedKey: Uint8Array;
-      if (uncompressedKey.length === 64) {
-        fullUncompressedKey = new Uint8Array(65);
-        fullUncompressedKey[0] = 0x04;
-        fullUncompressedKey.set(uncompressedKey, 1);
-      } else if (uncompressedKey.length === 65) {
-        fullUncompressedKey = uncompressedKey;
-      } else {
-        throw new Error(
-          `Invalid public key length: ${uncompressedKey.length}, expected 64 or 65 bytes`
-        );
-      }
+      const fullUncompressedKey =
+        this.ensureUncompressedKeyFormat(uncompressedKey);
 
       const point = secp256k1.ProjectivePoint.fromHex(fullUncompressedKey);
       const compressedKey = point.toRawBytes(true);
@@ -166,14 +151,46 @@ export class BlockdaemonSigner implements BaseSigner {
     }
   }
 
+  private parseTSMPublicKey(base64PublicKey: string): TSMPublicKeyResponse {
+    return JSON.parse(
+      Buffer.from(base64PublicKey, "base64").toString("utf-8")
+    ) as TSMPublicKeyResponse;
+  }
+
+  private validateTSMPublicKey(publicKeyJson: TSMPublicKeyResponse): void {
+    if (
+      publicKeyJson.scheme !== "ECDSA" ||
+      publicKeyJson.curve !== "secp256k1"
+    ) {
+      throw new Error(
+        `Unsupported key format: ${publicKeyJson.scheme}/${publicKeyJson.curve}`
+      );
+    }
+  }
+
+  private ensureUncompressedKeyFormat(uncompressedKey: Buffer): Uint8Array {
+    if (uncompressedKey.length === EXPECTED_UNCOMPRESSED_LENGTH) {
+      const fullUncompressedKey = new Uint8Array(EXPECTED_FULL_LENGTH);
+      fullUncompressedKey[0] = UNCOMPRESSED_KEY_PREFIX;
+      fullUncompressedKey.set(uncompressedKey, 1);
+      return fullUncompressedKey;
+    } else if (uncompressedKey.length === EXPECTED_FULL_LENGTH) {
+      return uncompressedKey;
+    } else {
+      throw new Error(
+        `Invalid public key length: ${uncompressedKey.length}, expected ${EXPECTED_UNCOMPRESSED_LENGTH} or ${EXPECTED_FULL_LENGTH} bytes`
+      );
+    }
+  }
+
   private async createTempCertFiles(): Promise<{
     certPath: string;
     keyPath: string;
     cleanup: () => void;
   }> {
     const tempDir = path.join(process.cwd(), "blockdaemon_client");
-    let certPath = this.clientCertPath;
-    let keyPath = this.clientKeyPath;
+    let certPath = process.env.BLOCKDAEMON_CLIENT_CERT_PATH || "";
+    let keyPath = process.env.BLOCKDAEMON_CLIENT_KEY_PATH || "";
     const filesToCleanup: string[] = [];
 
     if (this.clientCertContent) {
@@ -261,18 +278,8 @@ export class BlockdaemonSigner implements BaseSigner {
   }
 
   private parseKeygenOutput(output: string): BlockdaemonKeygenResponse {
-    const lines = output.split("\n");
-    let keyId = "";
-    let publicKey = "";
-
-    for (const line of lines) {
-      if (line.includes("Key ID:")) {
-        keyId = line.split("Key ID:")[1]?.trim() || "";
-      }
-      if (line.includes("public key:")) {
-        publicKey = line.split("public key:")[1]?.trim() || "";
-      }
-    }
+    const keyId = this.extractValueFromOutput(output, "Key ID:");
+    const publicKey = this.extractValueFromOutput(output, "public key:");
 
     if (!keyId || !publicKey) {
       throw new Error(`Failed to parse key generation output: ${output}`);
@@ -281,25 +288,24 @@ export class BlockdaemonSigner implements BaseSigner {
     return { keyId, publicKey };
   }
 
+  private extractValueFromOutput(output: string, pattern: string): string {
+    const lines = output.split("\n");
+    for (const line of lines) {
+      if (line.includes(pattern)) {
+        return line.split(pattern)[1]?.trim() || "";
+      }
+    }
+    return "";
+  }
+
   private parseSignOutput(
     output: string
   ): BlockdaemonSignResponse & { r: string; s: string } {
-    const lines = output.split("\n");
-    let r = "";
-    let s = "";
-    let keyId = "";
-
-    for (const line of lines) {
-      if (line.includes("r:")) {
-        r = line.split("r:")[1]?.trim() || "";
-      }
-      if (line.includes("s:")) {
-        s = line.split("s:")[1]?.trim() || "";
-      }
-      if (line.includes("key ID:") || line.includes("Key ID:")) {
-        keyId = line.split(/key ID:|Key ID:/)[1]?.trim() || "";
-      }
-    }
+    const r = this.extractValueFromOutput(output, "r:");
+    const s = this.extractValueFromOutput(output, "s:");
+    const keyId =
+      this.extractValueFromOutput(output, "Key ID:") ||
+      this.extractValueFromOutput(output, "key ID:");
 
     if (!r || !s) {
       throw new Error(`Failed to parse signature output: ${output}`);
