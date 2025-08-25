@@ -1,4 +1,4 @@
-import { spawn } from "child_process";
+import { spawn, execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import { secp256k1 } from "@noble/curves/secp256k1";
@@ -101,7 +101,7 @@ export class BlockdaemonSigner implements BaseSigner {
     }
 
     try {
-      require("child_process").execSync("go version", { stdio: "ignore" });
+      execSync("go version", { stdio: "ignore" });
     } catch {
       throw new Error("Go is not installed or not available in PATH");
     }

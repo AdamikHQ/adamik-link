@@ -1,4 +1,5 @@
 import * as dotenv from "dotenv";
+import * as fs from "fs";
 import * as path from "path";
 import {
   AdamikCurve,
@@ -16,7 +17,6 @@ async function testBlockdaemonSignerBasic() {
   try {
     // Test 1: Certificate file validation
     console.log("\n1. Testing certificate file validation...");
-    const fs = require("fs");
 
     const certPath =
       process.env.BLOCKDAEMON_CLIENT_CERT_PATH ||
