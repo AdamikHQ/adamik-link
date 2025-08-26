@@ -31,17 +31,36 @@ export const encodeTransaction = async ({
     name: "verb",
     message: "What type of transaction do you want to perform?",
     choices: [
-      { title: "Transfer", value: "transfer" },
-      { title: "Stake", value: "stake" },
+      {
+        title: "Transfer",
+        value: "transfer",
+        disabled:
+          !chain.supportedFeatures.write.transaction.type.transfer &&
+          !chain.supportedFeatures.write.transaction.type.transferToken,
+      },
+      {
+        title: "Enable Token",
+        value: "enableToken",
+        disabled: !chain.supportedFeatures.write.transaction.type.enableToken,
+      },
+      {
+        title: "Stake",
+        value: "stake",
+        disabled: !chain.supportedFeatures.write.transaction.type.stake,
+      },
       {
         title: "Unstake",
         value: "unstake",
-        disabled: BigInt(accountState.balances.staking?.locked || 0n) === 0n,
+        disabled:
+          !chain.supportedFeatures.write.transaction.type.unstake ||
+          BigInt(accountState.balances.staking?.locked || 0n) === 0n,
       },
       {
         title: "Withdraw",
         value: "withdraw",
-        disabled: BigInt(accountState.balances.staking?.unlocked || 0n) === 0n,
+        disabled:
+          !chain.supportedFeatures.write.transaction.type.withdraw ||
+          BigInt(accountState.balances.staking?.unlocked || 0n) === 0n,
       },
     ],
     initial: 0,
@@ -108,6 +127,18 @@ export const encodeTransaction = async ({
 
         requestBody.transaction.data.recipientAddress = recipientAddress;
       }
+      break;
+    }
+    case "enableToken": {
+      requestBody.transaction.data.mode = "enableToken";
+
+      const { tokenId } = await overridedPrompt({
+        type: "text",
+        name: "tokenId",
+        message: `Which asset do you want to enable?`,
+      });
+      requestBody.transaction.data.tokenId = tokenId;
+
       break;
     }
     case "stake": {
@@ -203,58 +234,63 @@ export const encodeTransaction = async ({
   const assetTicker = token ? token.token.ticker : chain.ticker;
   const assetDecimals = token ? parseInt(token.token.decimals) : chain.decimals;
 
-  const balanceAvailable = (() => {
-    switch (requestBody.transaction.data.mode) {
-      case "transferToken": {
-        return token ? BigInt(token.amount) : 0n;
+  // Compute transaction amount
+  if (requestBody.transaction.data.mode !== "enableToken") {
+    const balanceAvailable = (() => {
+      switch (requestBody.transaction.data.mode) {
+        case "transferToken": {
+          return token ? BigInt(token.amount) : 0n;
+        }
+        case "unstake": {
+          const validatorAddress =
+            requestBody.transaction.data.validatorAddress;
+          const position =
+            validatorAddress &&
+            accountState.balances.staking?.positions.find(
+              (p) =>
+                p.validatorAddresses.includes(validatorAddress) &&
+                p.status === "locked"
+            );
+          return position ? BigInt(position.amount) : 0n;
+        }
+        case "withdraw": {
+          const validatorAddress =
+            requestBody.transaction.data.validatorAddress;
+          const position =
+            validatorAddress &&
+            accountState.balances.staking?.positions.find(
+              (p) =>
+                p.validatorAddresses.includes(validatorAddress) &&
+                p.status === "unlocked"
+            );
+          return position ? BigInt(position.amount) : 0n;
+        }
+        default: {
+          // Native transfer + stake
+          return BigInt(accountState.balances.native.available);
+        }
       }
-      case "unstake": {
-        const validatorAddress = requestBody.transaction.data.validatorAddress;
-        const position =
-          validatorAddress &&
-          accountState.balances.staking?.positions.find(
-            (p) =>
-              p.validatorAddresses.includes(validatorAddress) &&
-              p.status === "locked"
-          );
-        return position ? BigInt(position.amount) : 0n;
-      }
-      case "withdraw": {
-        const validatorAddress = requestBody.transaction.data.validatorAddress;
-        const position =
-          validatorAddress &&
-          accountState.balances.staking?.positions.find(
-            (p) =>
-              p.validatorAddresses.includes(validatorAddress) &&
-              p.status === "unlocked"
-          );
-        return position ? BigInt(position.amount) : 0n;
-      }
-      default: {
-        // Native transfer + stake
-        return BigInt(accountState.balances.native.available);
-      }
+    })();
+
+    const { amount } = await overridedPrompt({
+      type: "text",
+      name: "amount",
+      message: `How much ${assetTicker} to ${verb}? (default is 0.1% of your balance)`,
+      initial: amountToMainUnit(
+        (balanceAvailable / 1000n).toString(),
+        assetDecimals
+      ) as string,
+    });
+
+    if (!amount) {
+      throw new Error("No amount provided");
     }
-  })();
 
-  const { amount } = await overridedPrompt({
-    type: "text",
-    name: "amount",
-    message: `How much ${assetTicker} to ${verb}? (default is 0.1% of your balance)`,
-    initial: amountToMainUnit(
-      (balanceAvailable / 1000n).toString(),
+    requestBody.transaction.data.amount = amountToSmallestUnit(
+      amount,
       assetDecimals
-    ) as string,
-  });
-
-  if (!amount) {
-    throw new Error("No amount provided");
+    ).toString();
   }
-
-  requestBody.transaction.data.amount = amountToSmallestUnit(
-    amount,
-    assetDecimals
-  ).toString();
 
   infoTerminal(
     `Encoding ${requestBody.transaction.data.mode} transaction...`,
