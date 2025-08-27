@@ -75,9 +75,9 @@ const transactionBroadcast = async () => {
         amount: "10000",
         useMaxAmount: false,
         validatorAddress: "",
-        params: JSON.stringify({
+        params: {
           timeout: Math.floor(Date.now() / 1000) + 300,
-        }),
+        },
       },
     },
   };
