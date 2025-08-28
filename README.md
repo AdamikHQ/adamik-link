@@ -10,6 +10,7 @@ A TypeScript-based CLI tool for interacting with Adamik. This tool allows you to
 - Encode and sign transactions
 - Broadcast signed transactions
 - Support for multiple signing providers:
+  - Blockdaemon TSM
   - Dfns
   - Sodot
   - Turnkey
@@ -18,7 +19,8 @@ A TypeScript-based CLI tool for interacting with Adamik. This tool allows you to
 
 - Node.js (v16 or higher recommended)
 - pnpm or npm or yarn
-- Access to at least one of the supported signing providers (Sodot or Turnkey)
+- Access to at least one of the supported signing providers (Blockdaemon TSM, Dfns, Sodot, or Turnkey)
+- Go (v1.19 or higher) if using Blockdaemon TSM signer
 
 ## Installation
 
@@ -57,6 +59,32 @@ ADAMIK_API_KEY="<your-adamik-api-key>" # Get your free key on https://dashboard.
 ```
 
 ### Signer-specific Configuration
+
+#### For Blockdaemon TSM Signer
+
+**Option 1: Using Certificate Files**
+
+```
+# Certificate files (obtain from Blockdaemon)
+BLOCKDAEMON_CLIENT_CERT_PATH="/path/to/your/client.crt"
+BLOCKDAEMON_CLIENT_KEY_PATH="/path/to/your/client.key"
+BLOCKDAEMON_EXISTING_KEY_IDS="<comma-separated-key-ids>"  # Optional: reuse existing keys
+```
+
+**Option 2: Using Certificate Content Directly**
+
+```
+# Certificate content directly in environment variables (more secure for some deployments)
+BLOCKDAEMON_CLIENT_CERT_CONTENT="-----BEGIN CERTIFICATE-----
+your-certificate-content-here
+-----END CERTIFICATE-----"
+BLOCKDAEMON_CLIENT_KEY_CONTENT="-----BEGIN EC PRIVATE KEY-----
+your-private-key-content-here
+-----END EC PRIVATE KEY-----"
+BLOCKDAEMON_EXISTING_KEY_IDS="<comma-separated-key-ids>"  # Optional: reuse existing keys
+```
+
+**Note**: You can mix both approaches (e.g., use file for certificate and content for key). Certificate content will take precedence over file paths if both are provided.
 
 #### For Sodot Signer
 
@@ -105,13 +133,14 @@ yarn start
 
 2. Follow the interactive prompts to:
    - Select a chain
-   - Choose a signer (Sodot or Turnkey)
+   - Choose a signer (Blockdaemon TSM, Dfns, Sodot, or Turnkey)
    - View account information
    - Create and sign transactions
    - Broadcast transactions to the network
 
 ## Supported Signers
 
+- [Blockdaemon TSM](https://www.blockdaemon.com/) - Threshold Signature Method with distributed key management
 - [Dfns](https://www.dfns.co/)
 - [Sodot](https://www.sodot.dev/)
 - [Turnkey](https://www.turnkey.com/)
@@ -131,7 +160,7 @@ This signer allows you to use a BIP39 mnemonic phrase directly for signing trans
 - There is no hardware security module (HSM) protection
 - Your private keys are exposed in the application's memory
 
-For production environments, always use one of the secure signing providers listed above (Dfns, Sodot, or Turnkey).
+For production environments, always use one of the secure signing providers listed above (Blockdaemon TSM, Dfns, Sodot, or Turnkey).
 
 ## Important Notes
 

@@ -9,8 +9,8 @@ import { LocalSigner } from "../signers/LocalSigner";
 import { errorTerminal, infoTerminal, italicInfoTerminal } from "../utils";
 import { encodePubKeyToAddress } from "../adamik/encodePubkeyToAddress";
 import { ethers } from "ethers";
-const TonWeb = require("tonweb");
-const tonMnemonic = require("tonweb-mnemonic");
+import * as TonWeb from "tonweb";
+import * as tonMnemonic from "tonweb-mnemonic";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 

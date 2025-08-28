@@ -48,8 +48,25 @@ export const broadcastTransaction = async (
     const result =
       (await broadcastResponse.json()) as AdamikAPIError<AdamikBroadcastResponse>;
 
+    // Add detailed logging for debugging
+    if (!broadcastResponse.ok || (result.status && result.status.errors.length > 0)) {
+      errorTerminal("Detailed broadcast response:", "Adamik");
+      console.log("HTTP Status:", broadcastResponse.status);
+      console.log("Response:", JSON.stringify(result, null, 2));
+    }
+
     return result;
   } catch (e: any) {
+    errorTerminal("Broadcast request failed:", "Adamik");
     errorTerminal(e.message, "Adamik");
+    errorTerminal("Response status:", broadcastResponse.status.toString());
+    
+    // Try to get response text for more details
+    try {
+      const responseText = await broadcastResponse.text();
+      errorTerminal("Response body:", responseText);
+    } catch (textError) {
+      errorTerminal("Could not read response body", "Adamik");
+    }
   }
 };
