@@ -330,11 +330,11 @@ export class IoFinnetSigner implements BaseSigner {
     // Remove 0x prefix if present for consistency with Adamik's expected format
     publicKey = publicKey.replace(/^0x/i, '');
 
-    // For Bitcoin, compress the public key if it's uncompressed
+    // For chains using secp256k1, compress the public key if it's uncompressed
     // IoFinnet returns uncompressed (65 bytes starting with 04)
-    // Adamik needs compressed format (33 bytes starting with 02/03) for correct address derivation
-    if ((this.chainId === "bitcoin" || this.chainId === "bitcoin-testnet") && publicKey.startsWith("04")) {
-      infoTerminal(`Converting uncompressed public key to compressed for Bitcoin`, this.signerName);
+    // Many chains (Bitcoin, Cosmos, etc.) need compressed format (33 bytes starting with 02/03)
+    if (this.signerSpec.curve === AdamikCurve.SECP256K1 && publicKey.startsWith("04")) {
+      infoTerminal(`Converting uncompressed public key to compressed for ${this.chainId}`, this.signerName);
       const uncompressedBuffer = Buffer.from(publicKey, 'hex');
       const compressedBuffer = compressPublicKey(uncompressedBuffer);
       publicKey = compressedBuffer.toString('hex');
