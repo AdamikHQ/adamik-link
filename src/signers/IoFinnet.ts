@@ -2,6 +2,7 @@ import {
   AdamikCurve,
   AdamikHashFunction,
   AdamikSignerSpec,
+  AdamikSignatureFormat,
 } from "../adamik/types";
 import { infoTerminal, italicInfoTerminal } from "../utils";
 import { Signer } from "./index";
@@ -112,8 +113,9 @@ export class IoFinnetSigner implements BaseSigner {
 
   /**
    * Convert Adamik chain ID to IoFinnet asset ID
+   * Returns null if the chain is not in IoFinnet's asset list
    */
-  private convertChainIdToIoFinnetAssetId(chainId: string): string {
+  private convertChainIdToIoFinnetAssetId(chainId: string): string | null {
     switch (chainId) {
       case "bitcoin":
         return "BTC";
@@ -130,7 +132,9 @@ export class IoFinnetSigner implements BaseSigner {
       case "tron":
         return "TRON";
       default:
-        throw new Error(`Unsupported chainId: ${chainId}`);
+        // Return null for chains not in IoFinnet's asset list
+        // This is not an error - many chains can still be signed using the curve-based approach
+        return null;
     }
   }
 
@@ -218,6 +222,35 @@ export class IoFinnetSigner implements BaseSigner {
         // Default to ECDSA for Bitcoin and similar chains
         return "ECDSA_SECP256K1";
     }
+  }
+
+  /**
+   * Determine if a chain needs compressed public keys
+   * 
+   * Only compress when we're certain it's required.
+   * Bitcoin and Cosmos chains need compressed keys for Adamik API.
+   */
+  private doesChainNeedCompressedKey(): boolean {
+    // Bitcoin and Bitcoin testnet need compressed keys
+    if (this.chainId === "bitcoin" || this.chainId === "bitcoin-testnet") {
+      return true;
+    }
+    
+    // Cosmos ecosystem chains need compressed keys for Adamik address derivation
+    // The Adamik API requires compressed format for these chains
+    const cosmosChains = [
+      "cosmoshub", "osmosis", "juno", "stargaze", "akash", 
+      "sentinel", "persistence", "iris", "crypto-org", "kava",
+      "secret", "terra", "injective", "sei", "celestia", "dydx",
+      "agoric", "regen", "evmos", "stride", "sommelier", "quicksilver"
+    ];
+    if (cosmosChains.some(chain => this.chainId.includes(chain))) {
+      return true;
+    }
+    
+    // For all other chains, keep uncompressed
+    // Most EVM chains (Ethereum, BSC, Polygon) work with uncompressed
+    return false;
   }
 
   /**
@@ -330,15 +363,24 @@ export class IoFinnetSigner implements BaseSigner {
     // Remove 0x prefix if present for consistency with Adamik's expected format
     publicKey = publicKey.replace(/^0x/i, '');
 
-    // For chains using secp256k1, compress the public key if it's uncompressed
-    // IoFinnet returns uncompressed (65 bytes starting with 04)
-    // Many chains (Bitcoin, Cosmos, etc.) need compressed format (33 bytes starting with 02/03)
+    // Handle public key compression based on chain requirements
+    // IoFinnet returns uncompressed keys (65 bytes starting with 04)
+    // Different chains have different requirements:
     if (this.signerSpec.curve === AdamikCurve.SECP256K1 && publicKey.startsWith("04")) {
-      infoTerminal(`Converting uncompressed public key to compressed for ${this.chainId}`, this.signerName);
-      const uncompressedBuffer = Buffer.from(publicKey, 'hex');
-      const compressedBuffer = compressPublicKey(uncompressedBuffer);
-      publicKey = compressedBuffer.toString('hex');
-      infoTerminal(`Compressed public key: ${publicKey}`, this.signerName);
+      // Determine if this chain needs compressed public keys
+      // Bitcoin and Cosmos chains need compressed (33 bytes)
+      // Ethereum and EVM chains need uncompressed (65 bytes)
+      const needsCompressedKey = this.doesChainNeedCompressedKey();
+      
+      if (needsCompressedKey) {
+        infoTerminal(`Converting uncompressed public key to compressed for ${this.chainId}`, this.signerName);
+        const uncompressedBuffer = Buffer.from(publicKey, 'hex');
+        const compressedBuffer = compressPublicKey(uncompressedBuffer);
+        publicKey = compressedBuffer.toString('hex');
+        infoTerminal(`Compressed public key: ${publicKey}`, this.signerName);
+      } else {
+        infoTerminal(`Using uncompressed public key for ${this.chainId} (65 bytes)`, this.signerName);
+      }
     }
 
     infoTerminal(`Retrieved public key for ${curveType}`, this.signerName);
@@ -346,23 +388,44 @@ export class IoFinnetSigner implements BaseSigner {
   }
 
   /**
-   * Get address from IoFinnet vault
+   * Validate IoFinnet address against Adamik-derived address
    * 
-   * NOTE: This method is now largely redundant since we can get public keys
-   * and derive addresses via Adamik's encodePubKeyToAddress endpoint.
-   * Kept for backward compatibility and as a fallback.
+   * This method fetches the address from IoFinnet's assets endpoint (if available)
+   * and can be used to validate it matches the address derived from the public key.
    * 
-   * The main adamikLink flow will:
-   * 1. Try getPubkey() and convert via Adamik's encodePubKeyToAddress
-   * 2. Fall back to this method only if getPubkey() fails
+   * For chains not in IoFinnet's asset list, this returns null (not an error).
+   * The chain can still be used with IoFinnet signing via the curve-based approach.
+   * 
+   * @param expectedAddress - Optional address to validate against
+   * @returns IoFinnet's address or null if chain not in asset list
    */
-  async getAddress(): Promise<string> {
+  async getAddress(expectedAddress?: string): Promise<string> {
     if (this.address) {
       return this.address;
     }
 
-    // Since we now have public keys, we could derive the address ourselves
-    // But for backward compatibility, we'll still check IoFinnet's assets endpoint
+    // Check if this chain is in IoFinnet's asset list
+    const targetAssetId = this.convertChainIdToIoFinnetAssetId(this.chainId);
+    
+    if (!targetAssetId) {
+      // Chain not in IoFinnet's asset list - this is OK
+      // Many chains can still be signed using the curve-based approach
+      infoTerminal(
+        `Chain ${this.chainId} not in IoFinnet's asset list (this is normal for chains like Cosmos)`,
+        this.signerName
+      );
+      
+      // If we have an expected address, return it
+      if (expectedAddress) {
+        this.address = expectedAddress;
+        return expectedAddress;
+      }
+      
+      // Otherwise, we can't get an address from IoFinnet
+      throw new Error(
+        `Chain ${this.chainId} not supported by IoFinnet's asset endpoint, and no address provided`
+      );
+    }
     
     const token = await this.ensureAuthenticated();
 
@@ -386,12 +449,21 @@ export class IoFinnetSigner implements BaseSigner {
       const responseData = await response.json();
 
       // Find the asset that matches our chainId
-      const targetAssetId = this.convertChainIdToIoFinnetAssetId(this.chainId);
       const asset = responseData.data.find(
         (asset: any) => asset.id === targetAssetId
       );
 
       if (!asset) {
+        infoTerminal(
+          `Asset ${targetAssetId} not found in vault - chain may not be configured in IoFinnet`,
+          this.signerName
+        );
+        
+        if (expectedAddress) {
+          this.address = expectedAddress;
+          return expectedAddress;
+        }
+        
         throw new Error(
           `Asset not found for chainId: ${this.chainId} (looking for asset ID: ${targetAssetId})`
         );
@@ -400,11 +472,42 @@ export class IoFinnetSigner implements BaseSigner {
       // Note: IoFinnet's API returns the address in the 'publicKey' field (confusing naming)
       this.address = asset.publicKey;
       infoTerminal(
-        `Got address from assets endpoint: ${this.address}`,
+        `Got address from IoFinnet assets endpoint: ${this.address}`,
         this.signerName
       );
+      
+      // Validate against expected address if provided
+      if (expectedAddress && this.address !== expectedAddress) {
+        infoTerminal(
+          `⚠️ WARNING: Address mismatch detected!`,
+          this.signerName
+        );
+        infoTerminal(
+          `  IoFinnet address: ${this.address}`,
+          this.signerName
+        );
+        infoTerminal(
+          `  Adamik-derived:   ${expectedAddress}`,
+          this.signerName
+        );
+        infoTerminal(
+          `  Using IoFinnet's address, but this discrepancy should be investigated`,
+          this.signerName
+        );
+      }
+      
       return this.address!;
     } catch (error) {
+      // If we can't fetch from IoFinnet but have an expected address, use it
+      if (expectedAddress) {
+        infoTerminal(
+          `Could not fetch address from IoFinnet (${error}), using Adamik-derived address`,
+          this.signerName
+        );
+        this.address = expectedAddress;
+        return expectedAddress;
+      }
+      
       throw new Error(`Failed to get address from IoFinnet: ${error}`);
     }
   }
@@ -593,11 +696,71 @@ export class IoFinnetSigner implements BaseSigner {
     }
 
     // For non-Bitcoin chains, use the standard signing method
-    const signature = await this.signData(encodedMessage);
+    const rawSignature = await this.signData(encodedMessage);
+    
+    // Format the signature according to the chain's requirements
+    const formattedSignature = this.formatSignatureForChain(rawSignature);
+    
     infoTerminal("Transaction signed successfully", this.signerName);
-    return signature;
+    return formattedSignature;
   }
-
+  
+  /**
+   * Format IoFinnet signature according to chain requirements
+   * 
+   * IoFinnet returns signatures as hex string with various formats:
+   * - 64 bytes: r (32) + s (32) 
+   * - 65 bytes: r (32) + s (32) + v (1)
+   * - 66 bytes: r (32) + s (32) + v (2) - Cosmos sometimes uses 2-byte recovery
+   * 
+   * Different chains expect different formats:
+   * - Cosmos: r + s (64 bytes, no recovery)
+   * - Ethereum: r + s + v (65 bytes with recovery)
+   */
+  private formatSignatureForChain(iofinnetSignature: string): string {
+    // Remove 0x prefix if present
+    const cleanSig = iofinnetSignature.replace(/^0x/i, '');
+    
+    const sigLengthBytes = cleanSig.length / 2;
+    infoTerminal(`IoFinnet signature length: ${sigLengthBytes} bytes`, this.signerName);
+    
+    // Extract r and s (always first 64 bytes)
+    const r = cleanSig.slice(0, 64);  // First 32 bytes
+    const s = cleanSig.slice(64, 128); // Next 32 bytes
+    
+    // Format based on signature format spec
+    if (this.signerSpec.signatureFormat === AdamikSignatureFormat.RS) {
+      // Cosmos and similar chains only need r + s (64 bytes)
+      if (sigLengthBytes > 64) {
+        infoTerminal(`Formatting signature as RS (removing ${sigLengthBytes - 64} recovery bytes) for ${this.chainId}`, this.signerName);
+      }
+      return r + s;
+    } else if (this.signerSpec.signatureFormat === AdamikSignatureFormat.RSV) {
+      // Ethereum and similar chains need r + s + v
+      if (sigLengthBytes === 65) {
+        // Standard format with 1-byte recovery
+        return cleanSig;
+      } else if (sigLengthBytes === 66) {
+        // 2-byte recovery, take only the first byte for Ethereum
+        const v = cleanSig.slice(128, 130); // First recovery byte
+        infoTerminal(`Converting 2-byte recovery to 1-byte for Ethereum`, this.signerName);
+        return r + s + v;
+      }
+    }
+    
+    // If signature is already the expected length, return as is
+    if (sigLengthBytes === 64 && this.signerSpec.signatureFormat === AdamikSignatureFormat.RS) {
+      return cleanSig;
+    }
+    if (sigLengthBytes === 65 && this.signerSpec.signatureFormat === AdamikSignatureFormat.RSV) {
+      return cleanSig;
+    }
+    
+    // Unknown format, log warning and return as is
+    infoTerminal(`Warning: Unexpected signature format (${sigLengthBytes} bytes) for ${this.signerSpec.signatureFormat}, returning as is`, this.signerName);
+    return cleanSig;
+  }
+  
   public async signHash(_hash: string): Promise<string> {
     throw new Error("Not implemented - IoFinnet applies hashing internally");
   }
