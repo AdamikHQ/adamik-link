@@ -7,6 +7,7 @@ import { infoTerminal, italicInfoTerminal } from "../utils";
 import { Signer } from "./index";
 import { BaseSigner } from "./types";
 import { Transaction } from "bitcoinjs-lib";
+import { compressPublicKey } from "./IoFinnet-bitcoin-preimage";
 
 export interface IoFinnetSignatureResponse {
   id: string;
@@ -71,6 +72,8 @@ export class IoFinnetSigner implements BaseSigner {
   private accessToken: string | undefined;
   private vaultId: string;
   private address: string | undefined;
+  private vaultDetails: any | undefined;
+  private publicKeys: Map<string, string> = new Map();
 
   // Feature flag to control PSBT signing capability
   // Set to true once IoFinnet adds native PSBT signing support
@@ -201,21 +204,166 @@ export class IoFinnetSigner implements BaseSigner {
     return this.accessToken!;
   }
 
+  /**
+   * Get the curve type for the current chain
+   */
+  private getCurveTypeForChain(): string {
+    // Map Adamik curve to IoFinnet curve type
+    switch (this.signerSpec.curve) {
+      case AdamikCurve.SECP256K1:
+        return "ECDSA_SECP256K1";
+      case AdamikCurve.ED25519:
+        return "EDDSA_ED25519";
+      default:
+        // Default to ECDSA for Bitcoin and similar chains
+        return "ECDSA_SECP256K1";
+    }
+  }
+
+  /**
+   * Fetch and cache vault details including public keys
+   */
+  private async ensureVaultDetails(): Promise<void> {
+    if (this.vaultDetails) {
+      return;
+    }
+
+    const token = await this.ensureAuthenticated();
+
+    try {
+      infoTerminal("Fetching vault details from IoFinnet...", this.signerName);
+      
+      const response = await fetch(
+        `${this.baseUrl}/v1/vaults/${this.vaultId}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch vault details: ${response.statusText}`);
+      }
+
+      this.vaultDetails = await response.json();
+      
+      // Extract public keys from vault details
+      // The structure might vary, so we'll handle different possible formats
+      if (this.vaultDetails.curves && Array.isArray(this.vaultDetails.curves)) {
+        // IoFinnet returns curves array with algorithm, curve, and publicKey
+        for (const curveData of this.vaultDetails.curves) {
+          if (curveData.publicKey) {
+            // Map IoFinnet curve names to our internal format
+            let curveKey: string;
+            if (curveData.algorithm === "ECDSA" && curveData.curve === "Secp256k1") {
+              curveKey = "ECDSA_SECP256K1";
+            } else if (curveData.algorithm === "EDDSA" && curveData.curve === "Edwards") {
+              curveKey = "EDDSA_ED25519";
+            } else {
+              curveKey = `${curveData.algorithm}_${curveData.curve}`;
+            }
+            
+            // Store the public key with proper formatting
+            // Add 0x prefix if not present for consistency
+            const pubKey = curveData.publicKey.startsWith("0x") 
+              ? curveData.publicKey 
+              : `0x${curveData.publicKey}`;
+            
+            this.publicKeys.set(curveKey, pubKey);
+            infoTerminal(`Found public key for ${curveKey} (${curveData.algorithm} ${curveData.curve})`, this.signerName);
+          }
+        }
+      } else if (this.vaultDetails.publicKeys) {
+        // Alternative format: direct publicKeys object
+        for (const [curve, pubKey] of Object.entries(this.vaultDetails.publicKeys)) {
+          this.publicKeys.set(curve as string, pubKey as string);
+          infoTerminal(`Found public key for ${curve}`, this.signerName);
+        }
+      } else if (this.vaultDetails.signingKeys) {
+        // Alternative structure with signing keys
+        for (const key of this.vaultDetails.signingKeys) {
+          if (key.publicKey && key.curve) {
+            this.publicKeys.set(key.curve, key.publicKey);
+            infoTerminal(`Found public key for ${key.curve}`, this.signerName);
+          }
+        }
+      } else if (this.vaultDetails.data?.publicKey) {
+        // Fallback: single public key in data
+        const curveType = this.getCurveTypeForChain();
+        this.publicKeys.set(curveType, this.vaultDetails.data.publicKey);
+        infoTerminal(`Found single public key, mapping to ${curveType}`, this.signerName);
+      }
+
+      if (this.publicKeys.size === 0) {
+        infoTerminal(
+          "Warning: No public keys found in vault details.",
+          this.signerName
+        );
+        // Only log full details if debugging is needed
+        if (process.env.DEBUG_IOFINNET) {
+          await italicInfoTerminal(JSON.stringify(this.vaultDetails, null, 2), 200);
+        }
+      }
+    } catch (error) {
+      throw new Error(`Failed to get vault details from IoFinnet: ${error}`);
+    }
+  }
+
   async getPubkey(): Promise<string> {
-    throw new Error(
-      "Not implemented - IoFinnet does not expose public keys directly"
-    );
+    // First, ensure we have vault details
+    await this.ensureVaultDetails();
+
+    // Get the appropriate public key based on the chain's curve
+    const curveType = this.getCurveTypeForChain();
+    let publicKey = this.publicKeys.get(curveType);
+
+    if (!publicKey) {
+      throw new Error(
+        `No public key found for curve type: ${curveType} on chain: ${this.chainId}`
+      );
+    }
+
+    // Remove 0x prefix if present for consistency with Adamik's expected format
+    publicKey = publicKey.replace(/^0x/i, '');
+
+    // For Bitcoin, compress the public key if it's uncompressed
+    // IoFinnet returns uncompressed (65 bytes starting with 04)
+    // Adamik needs compressed format (33 bytes starting with 02/03) for correct address derivation
+    if ((this.chainId === "bitcoin" || this.chainId === "bitcoin-testnet") && publicKey.startsWith("04")) {
+      infoTerminal(`Converting uncompressed public key to compressed for Bitcoin`, this.signerName);
+      const uncompressedBuffer = Buffer.from(publicKey, 'hex');
+      const compressedBuffer = compressPublicKey(uncompressedBuffer);
+      publicKey = compressedBuffer.toString('hex');
+      infoTerminal(`Compressed public key: ${publicKey}`, this.signerName);
+    }
+
+    infoTerminal(`Retrieved public key for ${curveType}`, this.signerName);
+    return publicKey;
   }
 
   /**
    * Get address from IoFinnet vault
-   * Note: IoFinnet provides addresses directly, not public keys
+   * 
+   * NOTE: This method is now largely redundant since we can get public keys
+   * and derive addresses via Adamik's encodePubKeyToAddress endpoint.
+   * Kept for backward compatibility and as a fallback.
+   * 
+   * The main adamikLink flow will:
+   * 1. Try getPubkey() and convert via Adamik's encodePubKeyToAddress
+   * 2. Fall back to this method only if getPubkey() fails
    */
   async getAddress(): Promise<string> {
     if (this.address) {
       return this.address;
     }
 
+    // Since we now have public keys, we could derive the address ourselves
+    // But for backward compatibility, we'll still check IoFinnet's assets endpoint
+    
     const token = await this.ensureAuthenticated();
 
     try {
@@ -249,8 +397,12 @@ export class IoFinnetSigner implements BaseSigner {
         );
       }
 
-      // Note: IoFinnet's API returns the address in the 'publicKey' field
+      // Note: IoFinnet's API returns the address in the 'publicKey' field (confusing naming)
       this.address = asset.publicKey;
+      infoTerminal(
+        `Got address from assets endpoint: ${this.address}`,
+        this.signerName
+      );
       return this.address!;
     } catch (error) {
       throw new Error(`Failed to get address from IoFinnet: ${error}`);
@@ -394,15 +546,19 @@ export class IoFinnetSigner implements BaseSigner {
     }
 
     // Use the specialized Bitcoin signing approach with proper hash handling
-    const { signBitcoinPsbtWithIoFinnetPreimage, getIoFinnetPublicKey } =
+    const { signBitcoinPsbtWithIoFinnetPreimage } =
       await import("./IoFinnet-bitcoin-preimage");
 
-    // Use the hardcoded public key to avoid extra signature call
-    const publicKey = getIoFinnetPublicKey();
+    // Get the public key dynamically from vault details - REQUIRED
+    // Note: getPubkey() already handles compression for Bitcoin
+    const publicKeyHex = await this.getPubkey();
     infoTerminal(
-      `Using hardcoded public key: ${publicKey.toString("hex")}`,
+      `Using dynamically fetched public key: ${publicKeyHex}`,
       this.signerName
     );
+    
+    // Convert to Buffer - the key is already compressed for Bitcoin
+    const publicKey = Buffer.from(publicKeyHex.replace("0x", ""), "hex");
 
     // Create a callback function to sign Bitcoin hash with IoFinnet
     // This sends SHA256(preimage) to IoFinnet, which applies SHA256 again
@@ -442,7 +598,7 @@ export class IoFinnetSigner implements BaseSigner {
     return signature;
   }
 
-  public async signHash(hash: string): Promise<string> {
+  public async signHash(_hash: string): Promise<string> {
     throw new Error("Not implemented - IoFinnet applies hashing internally");
   }
 

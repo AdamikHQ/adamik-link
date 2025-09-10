@@ -43,7 +43,7 @@
     "bip174": "2.1.1",
     "bip32": "5.0.0-rc.0",
     "bip39": "^3.1.0",
-    "bitcoinjs-lib": "^6.1.7",
+    "bitcoinjs-lib": "github:AdamikHQ/bitcoinjs-lib#master",
     "chai": "^5.2.0",
     "dotenv-cli": "^8.0.0",
     "mocha": "^11.1.0",
@@ -53,8 +53,6 @@
   },
   "packageManager": "pnpm@9.15.7+sha512.ed98f9c748442673c46964b70345bd2282c9b305e8eae539b34ab31d6ef24ef8dd59d8b55f27466f705500b009d9c113471cf87e544f3d5036b297330c26e996",
   "pnpm": {
-    "patchedDependencies": {
-      "bitcoinjs-lib": "patches/bitcoinjs-lib.patch"
-    }
+    "patchedDependencies": {}
   }
 }

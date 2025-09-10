@@ -5,7 +5,7 @@ import { encodePubKeyToAddress } from "./adamik/encodePubkeyToAddress";
 import { encodeTransaction } from "./adamik/encodeTransaction";
 import { getAccountState } from "./adamik/getAccountState";
 import { adamikGetChains } from "./adamik/getChains";
-import { signerSelector } from "./signers";
+import { signerSelector, Signer } from "./signers";
 import { errorTerminal, infoTerminal, italicInfoTerminal, overridedPrompt } from "./utils";
 import { displayBalance } from "./utils/displayBalance";
 import { transactionDetailView } from "./utils/displayTransaction";
@@ -42,34 +42,30 @@ export const adamikLink = async () => {
   let address: string;
   let pubkey: string | undefined = undefined;
 
+  // Always use the same flow for all signers and chains:
+  // 1. Get pubkey from signer
+  // 2. Convert pubkey to address via Adamik API (no fallback)
+  infoTerminal(`Getting pubkey from signer...`, signer.signerName);
+  pubkey = await signer.getPubkey();
+  
+  if (!pubkey) {
+    errorTerminal("Failed to get pubkey from signer", signer.signerName);
+    throw new Error("Cannot continue without public key");
+  }
+  
+  infoTerminal(`Pubkey:`, signer.signerName);
+  await italicInfoTerminal(JSON.stringify(pubkey, null, 2));
+
+  infoTerminal("========================================");
+
+  infoTerminal(`Encoding pubkey to address ...`, "Adamik");
   try {
-    infoTerminal(`Getting pubkey from signer...`, signer.signerName);
-    pubkey = await signer.getPubkey();
-    infoTerminal(`Pubkey:`, signer.signerName);
-    await italicInfoTerminal(JSON.stringify(pubkey, null, 2));
-
-    if (!pubkey) {
-      throw new Error("Failed to get pubkey from signer");
-    }
-
-    infoTerminal("========================================");
-
-    infoTerminal(`Encoding pubkey to address ...`, "Adamik");
     address = await encodePubKeyToAddress(pubkey, chainId);
     infoTerminal(`Address:`, "Adamik");
     await italicInfoTerminal(address);
   } catch (error) {
-    infoTerminal(`Failed to get pubkey from signer`, signer.signerName);
-    infoTerminal(`Getting address from signer...`, signer.signerName);
-
-    try {
-      address = await signer.getAddress();
-      infoTerminal(`Address:`, signer.signerName);
-      await italicInfoTerminal(address);
-    } catch (signerError) {
-      errorTerminal(`Failed to get address from signer: ${signerError}`, signer.signerName);
-      return;
-    }
+    errorTerminal(`Failed to encode address from pubkey: ${error}`, "Adamik");
+    throw new Error("Cannot convert public key to address via Adamik API");
   }
 
   infoTerminal("========================================");
@@ -149,56 +145,77 @@ export const adamikLink = async () => {
     return;
   }
 
-  const choices = transactionEncodeResponse.transaction.encoded.reduce((acc, encoded, index) => {
-    try {
-      if (encoded?.hash) {
-        acc.push({
-          title: `Hash (${encoded.hash.format}) : ${encoded.hash.value}`,
-          value: encoded.hash.format,
-        });
-      }
-      if (encoded?.raw) {
-        acc.push({
-          title: `Raw (${encoded.raw.format}) : ${encoded.raw.value}`,
-          value: encoded.raw.format,
-        });
-      }
-    } catch (error) {
-      // Skip invalid encoded objects
+  // For IoFinnet signer, automatically use raw format (they apply hashing internally)
+  let toSign: string;
+  let isHashPayload: string | undefined;
+  let isRawPayload: string | undefined;
+
+  if (signer.signerName === Signer.IOFINNET) {
+    // IoFinnet only supports raw transactions, not pre-hashed values
+    const rawEncoded = transactionEncodeResponse.transaction.encoded.find(
+      (encoded) => encoded?.raw
+    );
+    
+    if (!rawEncoded?.raw) {
+      errorTerminal("No raw transaction format available for IoFinnet", "Adamik");
+      throw new Error("IoFinnet requires raw transaction format");
     }
-    return acc;
-  }, [] as { title: string; value: string }[]);
+    
+    toSign = rawEncoded.raw.format;
+    isRawPayload = rawEncoded.raw.value;
+    
+    infoTerminal(`Using raw transaction format for IoFinnet (${toSign})`, signer.signerName);
+  } else {
+    // For other signers, let the user choose
+    const choices = transactionEncodeResponse.transaction.encoded.reduce((acc, encoded, index) => {
+      try {
+        if (encoded?.hash) {
+          acc.push({
+            title: `Hash (${encoded.hash.format}) : ${encoded.hash.value}`,
+            value: encoded.hash.format,
+          });
+        }
+        if (encoded?.raw) {
+          acc.push({
+            title: `Raw (${encoded.raw.format}) : ${encoded.raw.value}`,
+            value: encoded.raw.format,
+          });
+        }
+      } catch (error) {
+        // Skip invalid encoded objects
+      }
+      return acc;
+    }, [] as { title: string; value: string }[]);
 
-  if (choices.length === 0) {
-    errorTerminal("No valid signing choices found", "Adamik");
-    throw new Error("No valid signing formats available");
+    if (choices.length === 0) {
+      errorTerminal("No valid signing choices found", "Adamik");
+      throw new Error("No valid signing formats available");
+    }
+
+    const { toSign: selectedFormat } = await overridedPrompt({
+      type: "select",
+      name: "toSign",
+      message: "Which format do you want to sign with ?",
+      choices,
+    });
+    
+    toSign = selectedFormat;
+
+    isHashPayload = transactionEncodeResponse.transaction.encoded.find(
+      (encoded) => encoded.hash?.format === toSign
+    )?.hash?.value;
+
+    isRawPayload = transactionEncodeResponse.transaction.encoded.find(
+      (encoded) => encoded.raw?.format === toSign
+    )?.raw?.value;
   }
-
-  const { toSign } = await overridedPrompt({
-    type: "select",
-    name: "toSign",
-    message: "Which format do you want to sign with ?",
-    choices,
-  });
-
-  const isHashPayload = transactionEncodeResponse.transaction.encoded.find(
-    (encoded) => encoded.hash?.format === toSign
-  )?.hash?.value;
-
-  console.log("isHashPayload", isHashPayload);
-
-  const isRawPayload = transactionEncodeResponse.transaction.encoded.find(
-    (encoded) => encoded.raw?.format === toSign
-  )?.raw?.value;
-
-  console.log("isRawPayload", isRawPayload);
 
   if (!isHashPayload && !isRawPayload) {
     errorTerminal(`Encoding format ${toSign} doesn't seems to exist`, "Adamik");
     return;
   }
 
-  infoTerminal(`Signing ${isHashPayload ? "hash" : "transaction"} with ${toSign} ...`, signer.signerName);
+  infoTerminal(`Signing ${isHashPayload ? "hash" : "transaction"} with ${toSign}...`, signer.signerName);
 
   const signature = isHashPayload
     ? await signer.signHash(isHashPayload)

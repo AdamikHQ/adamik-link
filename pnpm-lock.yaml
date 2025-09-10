@@ -103,8 +103,8 @@ importers:
         specifier: ^3.1.0
         version: 3.1.0
       bitcoinjs-lib:
-        specifier: file:../bitcoinjs-lib
-        version: '@adamik/bitcoinjs-lib@file:../bitcoinjs-lib(typescript@5.7.3)'
+        specifier: github:AdamikHQ/bitcoinjs-lib#master
+        version: '@adamik/bitcoinjs-lib@https://codeload.github.com/AdamikHQ/bitcoinjs-lib/tar.gz/41c37e77464e1883a8f27867636f7d217cc65b44(typescript@5.7.3)'
       chai:
         specifier: ^5.2.0
         version: 5.2.0
@@ -134,8 +134,9 @@ packages:
       graphql:
         optional: true
 
-  '@adamik/bitcoinjs-lib@file:../bitcoinjs-lib':
-    resolution: {directory: ../bitcoinjs-lib, type: directory}
+  '@adamik/bitcoinjs-lib@https://codeload.github.com/AdamikHQ/bitcoinjs-lib/tar.gz/41c37e77464e1883a8f27867636f7d217cc65b44':
+    resolution: {tarball: https://codeload.github.com/AdamikHQ/bitcoinjs-lib/tar.gz/41c37e77464e1883a8f27867636f7d217cc65b44}
+    version: 7.0.0-adamik.1
     engines: {node: '>=18.0.0'}
 
   '@adraffy/ens-normalize@1.10.1':
@@ -4501,7 +4502,7 @@ snapshots:
   '@0no-co/graphql.web@1.1.2':
     optional: true
 
-  '@adamik/bitcoinjs-lib@file:../bitcoinjs-lib(typescript@5.7.3)':
+  '@adamik/bitcoinjs-lib@https://codeload.github.com/AdamikHQ/bitcoinjs-lib/tar.gz/41c37e77464e1883a8f27867636f7d217cc65b44(typescript@5.7.3)':
     dependencies:
       '@noble/hashes': 1.7.1
       bech32: 2.0.0

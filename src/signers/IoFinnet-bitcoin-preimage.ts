@@ -28,10 +28,8 @@ import { Psbt, Transaction } from "bitcoinjs-lib";
 import * as crypto from "crypto";
 import * as secp256k1 from "secp256k1";
 
-// Hardcoded IoFinnet public key for bc1q87kp4qcr5w5uy4vn7dqa8dcv7r0a6kwpw0r2dv
-// TODO: get this from IoFinnet API once they support it
-const IOFINNET_PUBLIC_KEY =
-  "034c51543db83b2c177be72788f9272f9d8436cd03d0ef09a0f0f9498e4da14c03";
+// Note: Public keys are now fetched dynamically from IoFinnet vault API
+// No hardcoded keys are used - the system requires successful vault API access
 
 /**
  * Get the Bitcoin signature hash that should be sent to IoFinnet for signing
@@ -281,12 +279,29 @@ function finalizeBitcoinPsbt(psbt: Psbt): string {
 }
 
 /**
- * Get the hardcoded IoFinnet public key
- *
- * @returns IoFinnet public key as Buffer
+ * Convert uncompressed public key to compressed format
+ * 
+ * @param uncompressedKey - Uncompressed public key (65 bytes starting with 04)
+ * @returns Compressed public key (33 bytes starting with 02 or 03)
  */
-function getIoFinnetPublicKey(): Buffer {
-  return Buffer.from(IOFINNET_PUBLIC_KEY, "hex");
+function compressPublicKey(uncompressedKey: Buffer): Buffer {
+  if (uncompressedKey.length !== 65 || uncompressedKey[0] !== 0x04) {
+    // If it's already compressed or invalid format, return as is
+    if (uncompressedKey.length === 33 && (uncompressedKey[0] === 0x02 || uncompressedKey[0] === 0x03)) {
+      return uncompressedKey;
+    }
+    throw new Error("Invalid uncompressed public key format");
+  }
+  
+  // Extract x and y coordinates
+  const x = uncompressedKey.slice(1, 33);
+  const y = uncompressedKey.slice(33, 65);
+  
+  // Determine prefix based on y coordinate parity
+  const prefix = (y[y.length - 1] & 1) === 0 ? 0x02 : 0x03;
+  
+  // Return compressed key
+  return Buffer.concat([Buffer.from([prefix]), x]);
 }
 
 /**
@@ -300,18 +315,18 @@ function getIoFinnetPublicKey(): Buffer {
  *
  * @param psbtHex - The PSBT to sign (hex string)
  * @param signDataCallback - Function to call IoFinnet with the Bitcoin signature hash
- * @param publicKey - The public key for signature verification (optional, uses hardcoded if not provided)
+ * @param publicKey - The public key for signature verification (REQUIRED - fetched from vault)
  * @returns Finalized transaction hex string
  */
 async function signBitcoinPsbtWithIoFinnetPreimage(
   psbtHex: string,
   signDataCallback: (bitcoinHash: string) => Promise<string>,
-  publicKey?: Buffer
+  publicKey: Buffer
 ): Promise<string> {
   const psbt = Psbt.fromHex(psbtHex);
 
-  // Use hardcoded public key if not provided
-  const pubKey = publicKey || getIoFinnetPublicKey();
+  // Public key is now required - no fallback to hardcoded values
+  const pubKey = publicKey;
 
   console.log("🔧 Using CORRECT HASH approach for IoFinnet signing");
   console.log("✅ This produces proper Bitcoin double hash signatures!");
@@ -382,6 +397,6 @@ async function signBitcoinPsbtWithIoFinnetPreimage(
 // Export only the functions that are actually used externally
 export {
   signBitcoinPsbtWithIoFinnetPreimage,
-  getIoFinnetPublicKey,
+  compressPublicKey,
   getBitcoinHashForIoFinnet, // Used by test scripts
 };
